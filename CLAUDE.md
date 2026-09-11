@@ -9,12 +9,21 @@ du wahrscheinlich Fehler, die schon gemacht und behoben wurden.**
 
 ## Projektüberblick
 
-Ein Tron/Lightcycle-Duell für eine Retro-Computing-Ausstellung
-(Classic Computing 2026). Drei echte Retro-Rechner (Atari XL/XE, Commodore
-64, Schneider/Amstrad CPC) treten gegeneinander an. Ein Python-Server auf
-einem modernen PC übernimmt die komplette Spiellogik und zeichnet alles
-selbst (pygame-Fenster, gut für einen Beamer) — die Retro-Rechner steuern
-nur per Joystick.
+Ein Tron/Lightcycle-Duell für eine Retro-Computing-Ausstellung, gebaut für
+[Classic Computing 2026](https://www.classic-computing.de/cc2026/) in
+Celle (10.–11. Oktober 2026, Halle 10 / CD-Kaserne). Drei echte
+Retro-Rechner (Atari XL/XE, Commodore 64, Schneider/Amstrad CPC) treten
+gegeneinander an. Ein Python-Server auf einem modernen PC übernimmt die
+komplette Spiellogik und zeichnet alles selbst (pygame-Fenster, gut für
+einen Beamer) — die Retro-Rechner steuern nur per Joystick.
+
+Jeder Retro-Rechner braucht ein passendes WiFi-Interface, um den Server
+zu erreichen:
+
+- **Atari XL/XE:** [FujiNet](https://fujinet.online/)
+- **Commodore 64 (Standard-Client):** [Meatloaf](https://github.com/idolpx/meatloaf)
+- **Commodore 64 (experimenteller Client):** [WiC64](https://www.wic64.de/)
+- **Schneider/Amstrad CPC:** [M4 Board](https://www.cpcwiki.eu/index.php/M4_Board)
 
 ## Architektur in Kürze
 
@@ -264,6 +273,21 @@ Für BASIC-Clients gibt es keine Möglichkeit, ohne echten Emulator
 zu testen — jede Änderung an einem `.bas`-Client sollte vor der Auslieferung
 zumindest auf Zeilennummern-Konsistenz geprüft werden (siehe oben), echte
 Funktionstests sind nur mit Emulator/Hardware durch den Nutzer möglich.
+
+**Stand der Emulator-Tests pro Plattform (Nutzererfahrung):**
+
+- **Atari:** Fujisan 2.0.5beta unter Linux funktioniert zuverlässig als
+  Testumgebung für den FujiNet-Client. Unter Windows funktioniert dasselbe
+  Setup **nicht** — Ursache bisher unbekannt, noch nicht untersucht.
+- **C64 (WiC64):** VICE kann den WiC64-Client emulieren, d.h. der
+  experimentelle WiC64-Client lässt sich damit **ohne echte Hardware**
+  testen — nützlich gerade weil die WiC64-Hardware selten verfügbar ist.
+- **CPC (M4):** CPCEmu simuliert ein M4-Interface, das ist aber **bisher
+  nicht getestet** — Status unklar, könnte als nächster Schritt für
+  hardwarefreies CPC-Testing dienen.
+- **Basic-Programme in ein D64-Image packen** (für C64-Tests, z.B. mit
+  VICE): [d64-inspector](https://github.com/pdbuchan/d64-inspector) hat
+  sich dafür als nützlich erwiesen.
 
 ### Foto-/FTP-Infrastruktur lokal simulieren
 

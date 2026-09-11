@@ -2,11 +2,22 @@
 
 Ein Netzwerk-Lightcycle-Duell für echte Retro-Computer (Atari XL/XE,
 Commodore 64, Schneider/Amstrad CPC) mit serverseitiger Darstellung —
-gebaut für Classic Computing 2026.
+gebaut für [Classic Computing 2026](https://www.classic-computing.de/cc2026/)
+in Celle (10.–11. Oktober 2026).
 
 Ausführliche Hintergründe, Design-Entscheidungen und mühsam erarbeitete
 Plattform-Eigenheiten stehen in [`CLAUDE.md`](./CLAUDE.md) — bitte vor
 größeren Änderungen lesen.
+
+## Hardware-Interfaces
+
+Die drei Retro-Rechner verbinden sich jeweils über ein WiFi-Interface
+mit dem Server:
+
+- **Atari XL/XE:** [FujiNet](https://fujinet.online/)
+- **Commodore 64:** [Meatloaf](https://github.com/idolpx/meatloaf)
+  (Standard-Client) oder [WiC64](https://www.wic64.de/) (experimentell)
+- **Schneider/Amstrad CPC:** [M4 Board](https://www.cpcwiki.eu/index.php/M4_Board)
 
 ## Schnellstart
 

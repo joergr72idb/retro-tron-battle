@@ -138,13 +138,22 @@ SERVER_BUILD = 8
 # =============================================================================
 
 # =============================================================================
+# REPO-BASISORDNER - alle relativen Pfade unten (Font, Logos, CSV, Foto-Cache)
+# werden von hier aus aufgeloest, NICHT vom aktuellen Arbeitsverzeichnis. So
+# funktioniert der Server unveraendert, egal von wo aus er gestartet wird,
+# solange die Ordnerstruktur des Repos (server/ neben assets/) erhalten
+# bleibt - z.B. nach dem Kopieren des ganzen Repos auf einen anderen Rechner.
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# =============================================================================
+
+# =============================================================================
 # DEMO-SCROLLTEXT - LAEUFT DURCHS SPIELFELD, SOLANGE AUF SPIELER GEWARTET WIRD
 # =============================================================================
 SCROLL_TEXT = ("   RETRO TRON BATTLE *** "
                "800XL, C64 AND CPC6128 ARE CLASSICAL HOME COMPUTER *** "
                "WHICH ONE WILL WIN THE MOST BATTLES? *** "
                "Video game warriors escaping game grid. This is an illegal exit. You must return to game grid. Repeat! This is an illegal exit. You must return to the grid.") # <-- EDIT: EIGENER TEXT
-SCROLL_FONT_PATH = "assets/font/Flynn-4v54.ttf"  # <-- EDIT: pfad zu einer eigenen .ttf-datei,
+SCROLL_FONT_PATH = os.path.join(BASE_DIR, "assets/font/Flynn-4v54.ttf")  # <-- EDIT: pfad zu einer eigenen .ttf-datei,
                                      # oder "" leer lassen fuer die standard-schrift
 SCROLL_SPEED = 4            # pixel pro frame (bei ~30fps)
 SCROLL_FONT_SIZE = 180       # schriftgroesse in pixel - 64=doppelt, 96=dreifach
@@ -161,7 +170,7 @@ SCROLL_COLOR_SPEED = 0.02    # farbverlauf pro frame (regenbogen)
 # Serverstart wird die Datei (falls vorhanden) eingelesen und der Punktestand
 # (Spiele gesamt, Siege pro Plattform, Unentschieden) daraus wiederhergestellt.
 # Fehlt die Datei, wird einfach bei 0 gestartet.
-RESULTS_CSV_PATH = "tron_results.csv"  # <-- EDIT: Pfad zur Ergebnis-CSV
+RESULTS_CSV_PATH = os.path.join(BASE_DIR, "tron_results.csv")  # <-- EDIT: Pfad zur Ergebnis-CSV
 CSV_FIELDNAMES = ["timestamp", "p1_platform", "p1_name", "p2_platform", "p2_name",
                    "result", "winner_platform", "winner_name"]
 # =============================================================================
@@ -198,7 +207,7 @@ HTTP_PHOTO_BASE_URL = "http://fotofix.classic-computing.de"  # <-- EDIT
 HTTP_PHOTO_FILENAME = "photo.jpg"                             # <-- EDIT falls sich das je aendert
                                                                 #     (gilt fuer FTP UND HTTP)
 
-PHOTO_CACHE_DIR = "photo_cache"  # heruntergeladene fotos werden hier gecacht (automatisch angelegt)
+PHOTO_CACHE_DIR = os.path.join(BASE_DIR, "photo_cache")  # heruntergeladene fotos werden hier gecacht (automatisch angelegt)
 
 # Lokaler, frei editierbarer Ordner fuer die drei Firmenlogos UND das
 # Vereinslogo der Veranstaltung (oben rechts, dauerhaft sichtbar). Jederzeit
@@ -212,7 +221,7 @@ PHOTO_CACHE_DIR = "photo_cache"  # heruntergeladene fotos werden hier gecacht (a
 # Vereinslogo. Endungs-Abgleich ist unter Linux gross-/kleinschreibungs-
 # abhaengig, daher werden sowohl klein- als auch grossgeschriebene
 # Endungen geprueft (LOGO_EXTENSIONS weiter unten).
-LOGO_DIR = "assets/logos"               # <-- EDIT falls die logos woanders liegen sollen
+LOGO_DIR = os.path.join(BASE_DIR, "assets/logos")               # <-- EDIT falls die logos woanders liegen sollen
 LOGO_NAME_CANDIDATES = {
     "ATARI": ["atari"],
     "C64": ["commodore", "c64"],
