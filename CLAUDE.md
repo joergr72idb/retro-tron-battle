@@ -305,6 +305,13 @@ python -m pyftpdlib -p 21
 Zum Testen bereits benutzte Besucher-PINs: `0001`, `0002`, `4711`,
 `0815`.
 
+**Fertiges Test-Fixture:** [`assets/test_ftproot/`](./assets/test_ftproot/)
+enthält ein Demo-Foto (`photo.jpg`) und eine ASCII-Kunst-Datei
+(`ascii-terminal.txt`) unter der PIN `MUSTER`, heruntergeladen vom echten
+`fotofix.classic-computing.de`-Server. Einfach den pyftpdlib-Befehl oben
+aus `assets/test_ftproot/` heraus starten und mit PIN `MUSTER` testen,
+statt eigene Testbilder anzulegen.
+
 ## Ideen für später
 
 - **`pygame` → `pygame-ce`/`pygame-ng` erwägen:** Klassisches `pygame` ist
