@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+photo_cache/
+tron_results.csv
+.DS_Store
