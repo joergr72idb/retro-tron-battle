@@ -10,8 +10,8 @@
 100 print"     COMMODORE 64 / WIC64 EDITION - BUILD 1"
 110 for i=1 to 40:print" ";:next i:print
 120 print chr$(146):print
-130 ho$="192.168.17.11":rem <-- edit: server ip
-140 po$="8098":rem <-- edit: http-bridge-port! (siehe server-startmeldung)
+130 ho$="192.168.17.158":rem <-- edit: server ip
+140 po$="8080":rem <-- edit: http-bridge-port! (siehe server-startmeldung)
 150 na$="COMMODORE64":rem <-- edit: spielername
 160 da=8190:rem zieladresse fuer wic64-abrufe (=$1ffe, wie im fotofix-beispiel)
 170 tx$="MCP:> WELCOME TO THE GRID...":gosub4000
@@ -25,9 +25,12 @@
 241 tx$="      UPLOAD TO GRID":gosub4000
 250 gosub3000:rem ascii-kunst holen und anzeigen
 260 tx$="MCP:> UPLOAD COMPLETED. CONNECTING GRIDSERVER "+ho$+":"+po$:gosub4000
-270 u$="HTTP://"+ho$+":"+po$+"/JOIN/C64/"+na$+"/"+pi$
+270 u$="http://"+ho$+":"+po$+"/join/C64/"+na$+"/"+pi$
 280 gosub2000:rem wic64-http-abruf -> r$
 285 print"[debug join r$=<";r$;">]"
+286 ifleft$(r$,7)="SESSION"then290
+287 ifleft$(r$,7)="session"then290
+288 fordl=1to3:forw=1to1500:nextw:nextdl:goto260
 290 tx$="MCP:> YOU'VE GRANTED ACCESS TO THE GAME GRID":gosub4000
 300 rem -- session-id aus r$ extrahieren --
 310 sp=1
@@ -53,9 +56,10 @@
 560 if(jand4)<>0thennd$="L"
 570 if(jand8)<>0thennd$="R"
 580 ifnd$<>"N"thendr$=nd$
-590 u$="HTTP://"+ho$+":"+po$+"/TICK/"+sn$+"/"+dr$
+590 u$="http://"+ho$+":"+po$+"/tick/"+sn$+"/"+dr$
 600 gosub2000
 610 ifr$=""then500
+615 ifleft$(r$,3)="ERR"thenprint"[debug tick r$=<";r$;"> sn$=<";sn$;">]"
 620 ifleft$(r$,3)="ERR"then900
 630 ifgs=1then660
 640 ifleft$(r$,5)<>"START"then660
@@ -83,7 +87,7 @@
 3000 rem -- ascii-kunst holen, zeichenweise auf 40 spalten reduziert --
 3001 rem    anzeigen. nutzt dieselbe wic64-routine, aber ohne r$ zu --
 3002 rem    fuellen (zu gross fuer eine c64-string-variable). --
-3010 u$="HTTP://FOTOFIX.CLASSIC-COMPUTING.DE/"+pi$+"/ASCII-TERMINAL.TXT"
+3010 u$="http://fotofix.classic-computing.de/"+pi$+"/ascii-terminal.txt"
 3020 fori=0to1999:pokeda+i,0:nexti
 3030 sys49152,u$,da
 3040 if 1 and peek(783) then return

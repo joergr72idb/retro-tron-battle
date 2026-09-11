@@ -113,14 +113,41 @@ nur per Joystick.
 - WiC64 hängt am **User-Port** (nicht am seriellen/IEC-Bus wie Meatloaf) —
   komplett andere Hardware, eigenes Protokoll.
 - Statt eigenen Assembler-Code zu schreiben: Ein vom Nutzer bereitgestelltes
-  Beispielprogramm (`FOTOFIX.C000`, aus einem D64-Image extrahiert und per
-  eigenem Mini-Disassembler analysiert) enthält bereits eine
-  **wiederverwendbare** `SYS 49152,U$,Zieladresse`-Routine, die die WiC64-
-  Low-Level-Details kapselt. Statt das nachzubauen: **einfach mit
-  wiederladen und mit unseren eigenen URLs aufrufen** (`archive/` enthält
-  den ursprünglichen, verworfenen Ansatz "eigenen Treiber von Grund auf
-  schreiben" — nicht weiterverfolgen, der oben genannte Ansatz ist
-  vielversprechender).
+  Beispielprogramm (`FOTOFIX.C000`, aus einem D64-Image extrahiert) enthält
+  bereits eine **wiederverwendbare** `SYS 49152,U$,Zieladresse`-Routine,
+  die die WiC64-Low-Level-Details kapselt. Statt das nachzubauen: **einfach
+  mit wiederladen und mit unseren eigenen URLs aufrufen** (`archive/`
+  enthält den ursprünglichen, verworfenen Ansatz "eigenen Treiber von
+  Grund auf schreiben" — nicht weiterverfolgen, der oben genannte Ansatz
+  ist vielversprechender). **Autor von `FOTOFIX.C000`: Andreas Beermann**
+  ("andi6510", siehe Disk-Label der Original-`fotofix.d64`) — die Datei
+  liegt jetzt unter `clients/c64/wic64-driver/` im Repo, siehe die
+  README dort für Details/Credit.
+- **Ursache des "`/join` scheinbar ok, `/tick` konsequent 'ERR UNKNOWN
+  SESSION'"-Bugs gefunden (2026-09-11, noch nicht auf echter Hardware
+  verifiziert):** Das im Repo mitgelieferte, definitiv funktionierende
+  Referenzbeispiel `fotofix.prg` (auf derselben Diskette) ruft `SYS 49152`
+  ausschließlich mit **kleingeschriebenen** URLs auf
+  (`"http://fotofix.classic-computing.de/"+id$+...`). Unser WiC64-Client
+  baute die Join-/Tick-URLs dagegen mit **Großschreibung**
+  (`"HTTP://"+ho$+":"+po$+"/JOIN/..."` bzw. `"/TICK/..."`). Zusätzlich
+  prüfte die Session-ID-Extraktion nicht, ob die Antwort überhaupt mit
+  `SESSION` beginnt — bei einer Fehlerantwort (z.B. vom Server als
+  `"ERR UNKNOWN REQUEST"` zurückgegeben, falls die Pfad-Großschreibung den
+  Server verwirrt) wurde einfach der Text nach dem ersten Leerzeichen als
+  vermeintliche Session-ID übernommen. Das erklärt den Eindruck "`/join`
+  hat funktioniert" (`r$` war nicht leer, sah nach einer ID aus), obwohl
+  in Wahrheit keine gültige Session existierte — jedes `/tick` scheiterte
+  danach zwangsläufig.
+  **Fix in `tron_c64_wic64_client.bas`:** alle URLs (Join, Tick,
+  ASCII-Kunst-Abruf) auf Kleinschreibung umgestellt (matching
+  `fotofix.prg`); Join-Antwort wird jetzt auf `SESSION`/`session`-Prefix
+  geprüft, bevor die Session-ID weiterverwendet wird (sonst kurze Pause +
+  Retry); Debug-Ausgabe bei `/tick`-Fehlern ergänzt (zeigt `r$` und `sn$`
+  auf dem Bildschirm), analog zum bereits vorhandenen Join-Debug-Print.
+  **Nächster Schritt:** auf echter Hardware testen — falls das
+  `/tick`-Problem weiterhin auftritt, zeigt die neue Debug-Ausgabe jetzt
+  wenigstens die rohe Serverantwort statt im Dunkeln zu tappen.
 - Ladetrick: Nach `LOAD"FOTOFIX.C000",8,1` stoppt das BASIC-Programm
   (Standardverhalten bei `LOAD` aus einem laufenden Programm heraus).
   Der klassische Trick, das zu umgehen: `POKE631,82:POKE632,85:
@@ -132,15 +159,15 @@ nur per Joystick.
   Tokenisierungsfehler. Textinhalte in Anführungszeichen bleiben davon
   unberührt (bleiben in der Schreibweise, mit der sie angezeigt werden
   sollen).
-- **Noch unklar / ungetestet:** Ob `SYS 49152` für sehr häufiges,
-  wiederholtes Abfragen (unser `/tick`-Polling, viele Aufrufe pro Sekunde)
-  genauso zuverlässig ist wie für die vom Original-Programm vorgesehenen
-  seltenen Einzelabrufe. Aktuell wird untersucht, warum der Server nach
-  einem scheinbar erfolgreichen `/join` keine Verbindung registriert,
-  während `/tick` konsequent "ERR UNKNOWN SESSION" zurückbekommt — das
-  deutet auf einen Bug in der `/join`-Antwortbehandlung im Client hin,
-  nicht zwingend auf ein WiC64-Problem selbst. **Stand: in Bearbeitung,
-  siehe letzte Nachrichten im ursprünglichen Chat-Verlauf.**
+- **"`/join` ok, `/tick` = 'ERR UNKNOWN SESSION'"-Bug:** siehe Fix-Eintrag
+  weiter oben (Großschreibung der URLs + fehlende Prefix-Prüfung der
+  Join-Antwort) — auf Hardware noch zu verifizieren.
+- **Weiterhin offen:** Ob `SYS 49152` für sehr häufiges, wiederholtes
+  Abfragen (unser `/tick`-Polling, viele Aufrufe pro Sekunde) genauso
+  zuverlässig ist wie für die vom Original-Programm vorgesehenen seltenen
+  Einzelabrufe — falls der obige Fix das Problem nicht vollständig löst,
+  hier als Nächstes ansetzen (z.B. Pacing/Delay zwischen `/tick`-Aufrufen
+  testen).
 
 ## Allgemeine, plattformübergreifende Muster
 
@@ -180,6 +207,47 @@ assert len(set(nums)) == len(nums), "Duplikate!"
 assert all(nums[i] < nums[i+1] for i in range(len(nums)-1)), "Nicht aufsteigend!"
 ```
 
+## Clients auf die Zielsysteme übertragen
+
+Wie der `.bas`-Quelltext tatsächlich auf dem jeweiligen Retro-Rechner
+landet (vom Nutzer erprobter Workflow, nicht offensichtlich aus dem Code
+ersichtlich):
+
+### Atari (FujiNet)
+
+Auf einem PC FujiNet + Altirra installieren. Über FujiNet eine Diskette
+mit dem N-Device auf die simulierte SD-Karte kopieren und davon booten.
+Im BASIC-Interpreter lässt sich das Programm per Rechtsklick einfügen
+("Paste"), dann abspeichern. Das fertige Disk-Image anschließend auf die
+echte SD-Karte des FujiNet übertragen.
+
+### Commodore 64 (Meatloaf)
+
+VICE installieren — enthält `petcat`, das eine Text-Datei als Tokens
+speichert: `petcat -w2 -o OUT.PRG -- IN.TXT` (aus `xyz.bas` wird
+`xyz.prg`). Danach über das Meatloaf-Webinterface auf den Flash-Speicher
+hochladen.
+
+**Achtung:** Ein HTTP-Aufruf aus BASIC heraus verstellt offenbar das
+Destination-Verzeichnis für Device 8. Zurücksetzen mit `LOAD"CD^",8`
+(Pfeil-nach-oben-Zeichen, PETSCII `$5E`), danach `LOAD"$",8` — dann ist
+wieder alles normal.
+
+### Schneider/Amstrad CPC (M4)
+
+Sonderfall wegen des AMSDOS-Headers (siehe auch Lektion oben zum
+"Line too long"-Fehler). Workflow: WinAPE starten, neue Diskette
+erstellen und formatieren, das BASIC-Programm per Paste in die Emulation
+kopieren, auf der virtuellen Diskette speichern. Anschließend über das
+M4-Webinterface diese Diskette auf die SD-Karte des M4 kopieren, dort
+auswählen und das Programm per Browser auf dem CPC starten.
+
+Bekannte Einschränkung: Beim `|HTTPMEM`-Aufruf (CALL der HTTP-Seite) wird
+jede andere Verarbeitung (insbesondere Joystick-Abfrage) blockiert — das
+Spielgefühl ist auf dem CPC dadurch spürbar weniger flüssig als auf den
+anderen Plattformen. Ein reduzierter Puffer hilft etwas, die Grenzen
+bleiben aber deutlich spürbar.
+
 ## Testing ohne echte Hardware
 
 Für den Server gibt es einen minimalen `pygame`-Stub (im ursprünglichen
@@ -197,6 +265,29 @@ zu testen — jede Änderung an einem `.bas`-Client sollte vor der Auslieferung
 zumindest auf Zeilennummern-Konsistenz geprüft werden (siehe oben), echte
 Funktionstests sind nur mit Emulator/Hardware durch den Nutzer möglich.
 
+### Foto-/FTP-Infrastruktur lokal simulieren
+
+Ohne den echten Event-Fotoserver lässt sich `PHOTO_SOURCE = "FTP"` lokal
+mit einem simplen FTP-Server testen (aus dem Bilderverzeichnis heraus
+starten):
+
+```bash
+# Linux
+sudo python -m pyftpdlib -p 21
+# Windows
+python -m pyftpdlib -p 21
+```
+
+Zum Testen bereits benutzte Besucher-PINs: `0001`, `0002`, `4711`,
+`0815`.
+
+## Ideen für später
+
+- **`pygame` → `pygame-ce`/`pygame-ng` erwägen:** Klassisches `pygame` ist
+  unmaintained; ein Community-Fork würde aktuellere Wartung/Fixes bringen.
+  Kein akuter Handlungsbedarf, aber bei größeren Server-Änderungen im
+  Hinterkopf behalten.
+
 ## Aktueller Stand (siehe auch git log für Details)
 
 - **Server**: stabil, produktiv im Einsatz getestet über viele Spiele.
@@ -204,5 +295,7 @@ Funktionstests sind nur mit Emulator/Hardware durch den Nutzer möglich.
 - **C64-Client (Meatloaf)**: stabil.
 - **CPC-Client**: stabil, inkl. ASCII-Kunst.
 - **C64-Client (WiC64)**: experimentell, erster Test zeigt Fortschritt
-  (ASCII-Kunst funktioniert), aber Spielverbindung selbst noch fehlerhaft
-  (siehe offener Punkt oben).
+  (ASCII-Kunst funktioniert). Spielverbindung (`/join`/`/tick`) hatte einen
+  Bug (URL-Großschreibung + fehlende Antwort-Prüfung), Fix am 2026-09-11
+  eingebaut, aber noch nicht auf echter Hardware verifiziert — siehe
+  Fix-Eintrag oben.

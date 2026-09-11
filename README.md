@@ -41,7 +41,9 @@ archive/    Verworfene Ansätze, aus Referenzgründen aufbewahrt
 Jeder `.bas`-Client hat einen kurzen Konfigurationsblock ganz oben
 (Server-IP, Port, Spielername) — vor der Nutzung anpassen. Der WiC64-
 Client (`clients/c64/tron_c64_wic64_client.bas`) braucht zusätzlich die
-Datei `FOTOFIX.C000` auf derselben Diskette (siehe `CLAUDE.md`).
+Datei `FOTOFIX.C000` auf derselben Diskette — liegt bereits unter
+[`clients/c64/wic64-driver/`](./clients/c64/wic64-driver/) bereit
+(WiC64-Treiber-Assembler von Andreas Beermann, siehe `CLAUDE.md`).
 
 ## Server-Konfiguration
 

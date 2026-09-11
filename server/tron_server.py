@@ -144,7 +144,7 @@ SCROLL_TEXT = ("   RETRO TRON BATTLE *** "
                "800XL, C64 AND CPC6128 ARE CLASSICAL HOME COMPUTER *** "
                "WHICH ONE WILL WIN THE MOST BATTLES? *** "
                "Video game warriors escaping game grid. This is an illegal exit. You must return to game grid. Repeat! This is an illegal exit. You must return to the grid.") # <-- EDIT: EIGENER TEXT
-SCROLL_FONT_PATH = "/home/joerg/Downloads/flynn-font/Flynn-4v54.ttf"  # <-- EDIT: pfad zu einer eigenen .ttf-datei,
+SCROLL_FONT_PATH = "assets/font/Flynn-4v54.ttf"  # <-- EDIT: pfad zu einer eigenen .ttf-datei,
                                      # oder "" leer lassen fuer die standard-schrift
 SCROLL_SPEED = 4            # pixel pro frame (bei ~30fps)
 SCROLL_FONT_SIZE = 180       # schriftgroesse in pixel - 64=doppelt, 96=dreifach
@@ -212,7 +212,7 @@ PHOTO_CACHE_DIR = "photo_cache"  # heruntergeladene fotos werden hier gecacht (a
 # Vereinslogo. Endungs-Abgleich ist unter Linux gross-/kleinschreibungs-
 # abhaengig, daher werden sowohl klein- als auch grossgeschriebene
 # Endungen geprueft (LOGO_EXTENSIONS weiter unten).
-LOGO_DIR = "/home/joerg/Downloads/Bilder"               # <-- EDIT falls die logos woanders liegen sollen
+LOGO_DIR = "assets/logos"               # <-- EDIT falls die logos woanders liegen sollen
 LOGO_NAME_CANDIDATES = {
     "ATARI": ["atari"],
     "C64": ["commodore", "c64"],
