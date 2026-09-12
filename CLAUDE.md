@@ -274,6 +274,49 @@ Spielgefühl ist auf dem CPC dadurch spürbar weniger flüssig als auf den
 anderen Plattformen. Ein reduzierter Puffer hilft etwas, die Grenzen
 bleiben aber deutlich spürbar.
 
+#### Möglicher einfacherer Weg: `MERGE` statt WinAPE-Umweg (noch nicht getestet)
+
+Der WinAPE-Umweg oben ist nötig, weil eine **tokenisierte** BASIC-Datei
+(normales `SAVE"datei"`) einen korrekten 128-Byte-AMSDOS-Header braucht,
+den das M4-Webinterface beim Hochladen einer rohen Textdatei nicht von
+selbst erzeugt (siehe "Line too long"-Lektion oben). Es gibt aber einen
+möglichen Weg, dieses Header-Problem komplett zu umgehen, indem man gar
+keine tokenisierte Datei braucht:
+
+- Der CPC kann eine **rohe ASCII-Textdatei** (entspricht `SAVE"datei",A`)
+  direkt einlesen und ausführen — ganz ohne Tokenisierung/Header —, und
+  zwar über den `MERGE`-Befehl:
+  ```
+  NEW
+  MERGE "dateiname.txt"
+  RUN
+  ```
+  `MERGE` liest die Textdatei Zeile für Zeile genauso ein, als würde man
+  sie von Hand eintippen (ähnlich dem WinAPE-"Auto Type"/Atari-Paste, nur
+  direkt vom CPC-Interpreter erledigt statt vom Emulator).
+- Alternative dazu, als reines Zeilen-Einlesen ohne BASIC-Interpretation:
+  ```
+  OPENIN "dateiname.txt":LINE INPUT #9,a$:CLOSEIN
+  ```
+- **Warum das speziell beim M4 interessant ist:** Das M4-Board stellt die
+  SD-Karte als normales FAT32-Dateisystem bereit — für `MERGE` wird kein
+  `.DSK`-Image gebraucht. Die erzeugte `.bas`/`.txt`-Datei müsste sich
+  also direkt auf die SD-Karte kopieren lassen; am CPC dann mit `|DIR`
+  sichtbar machen und per `MERGE "dateiname.txt"` laden — potenziell ganz
+  ohne WinAPE/Emulator-Umweg.
+- Falls doch ein direktes `RUN"dateiname"` ohne vorheriges `MERGE`
+  gewünscht ist: ein 128-Byte-AMSDOS-Header lässt sich der Textdatei auch
+  nachträglich per Kommandozeilen-Tool (z.B. `2cpc`, `cpcfs` mit
+  `-t 0`/`-t 1` beim Import in ein `.DSK`-Image) voranstellen — macht die
+  Datei-für-Datei-Behandlung aber wieder komplizierter als der
+  `MERGE`-Weg oben.
+
+**Status:** Aus einer KI-Recherche übernommen, **noch nicht auf echter
+M4-Hardware verifiziert** — falls es funktioniert, macht es den
+WinAPE-Umweg beim Übertragen neuer Client-Stände überflüssig. Vor dem
+nächsten Hardware-Test lohnt sich ein Ausprobieren mit einer kleinen
+Testdatei, bevor der komplette Client-Code darüber läuft.
+
 ## Testing ohne echte Hardware
 
 Für den Server gibt es einen minimalen `pygame`-Stub (im ursprünglichen
