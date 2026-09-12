@@ -304,13 +304,19 @@ Funktionstests sind nur mit Emulator/Hardware durch den Nutzer möglich.
   hardwarefreies CPC-Testing dienen.
 - **Basic-Programme in ein D64-Image packen** (für C64-Tests, z.B. mit
   VICE): [d64-inspector](https://github.com/pdbuchan/d64-inspector)
-  (Autor: P. David Buchan, GPLv3) hat sich dafür als nützlich erwiesen.
-  Für die PETSCII-Ansicht nutzt d64-inspector selbst die
-  [C64 TrueType](https://style64.org/c64-truetype)-Fontfamilie (Autor:
-  "Style", style64.org) — beides externe Werkzeuge, nicht Teil dieses
-  Repos, aber beim Testen hilfreich genug für eine Erwähnung hier.
-  Referenz-Disk-Images (u.a. für Atari/CPC) liegen unter
-  [`disk-images/`](./disk-images/), siehe README dort.
+  (Autor: P. David Buchan, GPLv3) hat sich dafür als nützlich erwiesen —
+  Quellcode liegt unter [`tools/d64-inspector/`](./tools/d64-inspector/)
+  im Repo (aus dem Original-Git-Clone übernommen, ohne `.git`- und
+  Build-Artefakte). Für die PETSCII-Ansicht nutzt d64-inspector selbst
+  die [C64 TrueType](https://style64.org/c64-truetype)-Fontfamilie
+  (Autor: "Style", style64.org), ebenfalls im Repo unter
+  [`tools/C64_TrueType_v1.2.1-STYLE/`](./tools/C64_TrueType_v1.2.1-STYLE/)
+  (unveränderte Distribution, siehe Lizenz dort). **Vor dem Bauen unter
+  Ubuntu:** `sudo apt install build-essential pkg-config libgtk-4-dev`,
+  dann die TrueType-Fonts aus `tools/C64_TrueType_v1.2.1-STYLE/fonts/`
+  installieren (für die PETSCII-Anzeige gedacht), danach `make` in
+  `tools/d64-inspector/src/`. Referenz-Disk-Images (u.a. für Atari/CPC)
+  liegen unter [`disk-images/`](./disk-images/), siehe README dort.
 
 ### Foto-/FTP-Infrastruktur lokal simulieren
 
