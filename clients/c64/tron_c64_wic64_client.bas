@@ -45,11 +45,11 @@
 400 ifleft$(r$,5)="START"then420
 410 goto500
 420 tx$="MCP:> GET READY FOR RACE. USE JOYSTICK -":gosub4000
-430 tx$="      PORT 2. WATCH ON GRID SCREEN":gosub4000
+430 tx$="      PORT 1. WATCH ON GRID SCREEN":gosub4000
 440 gs=1
 500 rem ===== hauptschleife =====
 510 dr$="N"
-520 j=(255-peek(56320))and31
+520 j=(255-peek(56321))and31
 530 nd$="N"
 540 if(jand1)<>0thennd$="U"
 550 if(jand2)<>0thennd$="D"
@@ -63,7 +63,7 @@
 620 ifleft$(r$,3)="ERR"then900
 630 ifgs=1then660
 640 ifleft$(r$,5)<>"START"then660
-650 tx$="MCP:> GET READY FOR RACE. USE JOYSTICK -":gosub4000:tx$="      PORT 2. WATCH ON GRID SCREEN":gosub4000:gs=1
+650 tx$="MCP:> GET READY FOR RACE. USE JOYSTICK -":gosub4000:tx$="      PORT 1. WATCH ON GRID SCREEN":gosub4000:gs=1
 660 ifleft$(r$,3)<>"END"then500
 700 rem -- spiel zu ende: ergebnis zeigen, dann neustart --
 710 tx$="MCP:> GAME ENDS HERE. "+r$:gosub4000

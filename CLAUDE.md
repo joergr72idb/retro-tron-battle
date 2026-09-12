@@ -49,6 +49,17 @@ zu erreichen:
   empfängt `start`. **Konsequenz:** Jeder String-Vergleich auf Client- UND
   Server-Seite muss das tolerieren (siehe `session_id.upper()` im Server,
   und die doppelten `="start" OR ="START"`-Prüfungen im C64-Client).
+- **Joystick-Port:** Beide C64-Clients (Meatloaf und WiC64) lesen den
+  Joystick jetzt aus **Port 1** (`PEEK(56321)`, CIA#1 Port B, `$DC01`) —
+  vorher wurde Port 2 (`PEEK(56320)`, `$DC00`) verwendet, was auf dem C64
+  zwar der übliche Default ist (Port 2 teilt sich keine Leitungen mit der
+  Tastaturmatrix, Port 1 schon), aber nicht der gewünschten Konvention
+  "alle Clients nutzen den ersten Joystick-Port ihres jeweiligen Rechners"
+  entspricht. **Achtung:** Da Port 1 (`$DC01`) dieselben Leitungen wie die
+  Tastaturmatrix-Zeilen nutzt, kann gleichzeitiges Tastendrücken theoretisch
+  Phantom-Joystick-Signale erzeugen ("Ghosting") — im aktuellen Client wird
+  während des Spiels aber nicht per Tastatur gelesen, daher in der Praxis
+  bisher kein beobachtetes Problem. Falls doch: erster Verdacht hier.
 - **`TI` ist eine reservierte Systemvariable** (Jiffy-Uhr) in Commodore
   BASIC — genau wie `PI` beim CPC (siehe unten) darf sie nicht als eigener
   Variablenname verwendet werden. Symptom: `?SYNTAX ERROR` an einer Stelle,
@@ -206,6 +217,12 @@ zu erreichen:
    Duplikate, aufsteigend, keine Zeile über der jeweiligen Plattform-
    Grenze — Atari ~120 Zeichen, C64/CPC deutlich lockerer). Ein kleines
    Python-Skript dafür lohnt sich, siehe Beispiel unten.
+7. **Konvention: Alle Clients nutzen den ersten Joystick-Port ihres
+   Rechners.** Atari (`STICK(JSPORT)` mit `JSPORT=0`) und CPC (`JOY(0)`)
+   waren von Anfang an korrekt. Beim C64 (Meatloaf UND WiC64) musste das
+   umgestellt werden — vorher wurde `PEEK(56320)`/`$DC00` (Port 2, der
+   auf dem C64 sonst übliche Default) gelesen, jetzt `PEEK(56321)`/`$DC01`
+   (Port 1).
 
 ```python
 # Schnelle BASIC-Zeilennummern-Konsistenzpruefung

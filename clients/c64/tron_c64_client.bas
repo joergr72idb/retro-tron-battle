@@ -5,7 +5,7 @@
 14 rem ierende meatloaf http-get-muster
 15 rem (geraet 8, sekundaeradresse 3) statt
 16 rem des unbestaetigten rohen sockets.
-17 rem joystick in port 2.
+17 rem joystick in port 1.
 18 rem ===================================
 20 print chr$(147);chr$(14)
 21 print chr$(18);
@@ -48,11 +48,11 @@
 260 if left$(r$,5)="start" then 280
 270 goto 400
 280 tx$="mcp:> get ready for race. use joystick -":gosub 4000
-281 tx$="      port 2. watch on grid screen":gosub 4000
+281 tx$="      port 1. watch on grid screen":gosub 4000
 290 gs=1
 400 rem ===== main loop =====
 405 dr$="N"
-410 j=(255-peek(56320)) and 31
+410 j=(255-peek(56321)) and 31
 420 nd$="N"
 430 if (j and 1)<>0 then nd$="U"
 440 if (j and 2)<>0 then nd$="D"
