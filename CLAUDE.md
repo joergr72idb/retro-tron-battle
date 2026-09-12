@@ -303,8 +303,14 @@ Funktionstests sind nur mit Emulator/Hardware durch den Nutzer möglich.
   nicht getestet** — Status unklar, könnte als nächster Schritt für
   hardwarefreies CPC-Testing dienen.
 - **Basic-Programme in ein D64-Image packen** (für C64-Tests, z.B. mit
-  VICE): [d64-inspector](https://github.com/pdbuchan/d64-inspector) hat
-  sich dafür als nützlich erwiesen.
+  VICE): [d64-inspector](https://github.com/pdbuchan/d64-inspector)
+  (Autor: P. David Buchan, GPLv3) hat sich dafür als nützlich erwiesen.
+  Für die PETSCII-Ansicht nutzt d64-inspector selbst die
+  [C64 TrueType](https://style64.org/c64-truetype)-Fontfamilie (Autor:
+  "Style", style64.org) — beides externe Werkzeuge, nicht Teil dieses
+  Repos, aber beim Testen hilfreich genug für eine Erwähnung hier.
+  Referenz-Disk-Images (u.a. für Atari/CPC) liegen unter
+  [`disk-images/`](./disk-images/), siehe README dort.
 
 ### Foto-/FTP-Infrastruktur lokal simulieren
 
@@ -335,6 +341,14 @@ statt eigene Testbilder anzulegen.
   unmaintained; ein Community-Fork würde aktuellere Wartung/Fixes bringen.
   Kein akuter Handlungsbedarf, aber bei größeren Server-Änderungen im
   Hinterkopf behalten.
+- **Soundeffekte aus dem Tron-Film (1982):** Ein paar kurze Audioclips
+  (Bit-artige "yes"/"no", MCP-artige Zeilen) liegen lokal bereit für
+  eine mögliche spätere Integration (z.B. als Sound-Effekte im Server bei
+  Spielstart/-ende). **Bewusst nicht ins Repo/Git aufgenommen** — es
+  handelt sich um Ausschnitte aus urheberrechtlich geschütztem
+  Filmmaterial (Disney), das sollte vor einer Verwendung/Veröffentlichung
+  nochmal bewusst abgewogen werden, insbesondere falls das Repo je
+  öffentlich gehostet wird.
 
 ## Aktueller Stand (siehe auch git log für Details)
 

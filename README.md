@@ -44,6 +44,8 @@ bots/       Automatisierte Test-Bots (Bash/PowerShell) zum Spielen ohne
             echte Hardware, z.B. für Demos oder Lasttests
 tools/      Diagnose-/Testprogramme für einzelne Plattformen
 docs/       PDF-Dokumentation (Protokoll, Erweiterung um weitere Plattformen)
+disk-images/ Fertige Referenz-Disk-Images (Atari/CPC/C64) zum Aufsetzen
+            echter Hardware, siehe README dort
 archive/    Verworfene Ansätze, aus Referenzgründen aufbewahrt
 ```
 

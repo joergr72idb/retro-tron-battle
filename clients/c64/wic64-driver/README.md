@@ -22,7 +22,8 @@ geladen). Extrahiert aus der von Andreas Beermann bereitgestellten
 `fotofix.d64` (Original-Diskette enthaelt zusaetzlich `fotofix` — das
 vollstaendige FOTOFIX-Beispielprogramm — und `rtbwic64`, eine bereits auf
 die Diskette getippte Kopie unseres eigenen WiC64-Clients fuers Testen auf
-echter Hardware).
+echter Hardware). Das komplette Original-Image liegt unter
+[`disk-images/fotofix.d64`](../../../disk-images/fotofix.d64).
 
 ## Bekannter Fehlerstring in der Routine
 
