@@ -64,6 +64,12 @@ zu erreichen:
   BASIC — genau wie `PI` beim CPC (siehe unten) darf sie nicht als eigener
   Variablenname verwendet werden. Symptom: `?SYNTAX ERROR` an einer Stelle,
   die beim genauen Hinsehen überhaupt nichts Verdächtiges enthält.
+  **Ist zweimal aufgetreten:** einmal ursprünglich, dann erneut am
+  2026-09-12 als `ti` Schleifenvariable in der Tippeffekt-Subroutine
+  (Zeile 4010, `tron_c64_client.bas`) — der WiC64-Client hat dieselbe
+  Subroutine, nennt die Variable dort aber bereits korrekt `tc`. Bei
+  neuem Code für diese Subroutine (oder Kopien davon) **immer `tc`
+  verwenden, nie `ti`**.
 - **HTTP-Session-Race-Condition:** Ein `/tick`, das genau beim Spielende
   eintrifft, muss noch Zeit haben, das `END`+`STATS` abzuholen, bevor die
   Session serverseitig aufgeräumt wird. Lösung: 15 Sekunden Gnadenfrist

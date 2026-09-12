@@ -12,7 +12,7 @@
 22 for i=1 to 40:print " ";:next i:print
 23 print "   retro tron battle -"
 24 print "   classic computing 2026"
-25 print "     commodore 64 edition - build 11"
+25 print "     commodore 64 edition - build 12"
 26 for i=1 to 40:print " ";:next i:print
 27 print chr$(146)
 28 print
@@ -112,9 +112,9 @@
 3260 sc=sc+1:if sc=80 then sc=0
 3270 return
 4000 rem -- tx$ mit terminal-tippeffekt ausgeben (wie das bild) --
-4010 for ti=1 to len(tx$)
-4020 print mid$(tx$,ti,1);
+4010 for tc=1 to len(tx$)
+4020 print mid$(tx$,tc,1);
 4030 for tw=1 to 80:next tw :rem tippgeschwindigkeit - kleiner=schneller
-4040 next ti
+4040 next tc
 4050 print
 4060 return
