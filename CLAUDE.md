@@ -444,6 +444,17 @@ statt eigene Testbilder anzulegen.
   Filmmaterial (Disney), das sollte vor einer Verwendung/Veröffentlichung
   nochmal bewusst abgewogen werden, insbesondere falls das Repo je
   öffentlich gehostet wird.
+- **Vierte Plattform: Apple II via FujiNet (nur falls am Ende Zeit übrig
+  ist):** FujiNet unterstützt offiziell auch Apple II/III, mit demselben
+  `N:`-Netzwerk-Device-Konzept wie beim Atari, inklusive rohem TCP —
+  Methode 1 (Port 6502) sollte sich also direkt anwenden lassen, ganz
+  ohne Server-Änderung (siehe Abschnitt "Erweiterung um weitere
+  Retro-Computer" oben). Client müsste Applesoft-BASIC-Eigenheiten
+  klären (u.a. `PDL()`-Paddle-API statt `STICK()` fürs Joystick-Lesen)
+  und hätte vermutlich eigene, noch unbekannte Eigenheiten wie jede
+  bisherige Plattform. Kein Apple II in der eigenen Hardware-Sammlung
+  bisher — reine Nice-to-have-Idee, keine Priorität vor CC2026.
+  Quickstart: <https://github.com/FujiNetWIFI/fujinet-firmware/wiki/Apple-II-&-III-FujiNet-Quickstart-Guide>
 
 ## Aktueller Stand (siehe auch git log für Details)
 
