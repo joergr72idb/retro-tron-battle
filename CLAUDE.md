@@ -70,6 +70,21 @@ zu erreichen:
   Subroutine, nennt die Variable dort aber bereits korrekt `tc`. Bei
   neuem Code für diese Subroutine (oder Kopien davon) **immer `tc`
   verwenden, nie `ti`**.
+- **Ungeprüfte Join-Antwort → Session-Mismatch (2026-09-12, auf echter
+  Hardware gefunden):** Der Meatloaf-Client extrahierte die Session-ID
+  aus der `/join`-Antwort rein positionsbasiert (erstes Leerzeichen bis
+  Zeilenende), ohne vorher zu prüfen, ob die Antwort überhaupt mit
+  `SESSION`/`session` beginnt — genau derselbe Bug, der beim WiC64-Client
+  schon einmal gefunden und dort bereits gefixt war (siehe WiC64-Abschnitt
+  unten), hier aber im Meatloaf-Client übersehen. Symptom auf Hardware:
+  Server-Log zeigt `/tick`-Aufrufe mit einer Session-ID, die serverseitig
+  nie existiert hat (`aktuelle keys: []`) — wirkt wie ein Groß-/
+  Kleinschreibungsproblem, ist aber eigentlich eine ungültige/leere
+  extrahierte ID aus einer nicht als Erfolg erkannten Antwort. **Fix:**
+  Join-Antwort wird jetzt auf `SESSION`/`session`-Prefix geprüft, bevor
+  die ID weiterverwendet wird (kurze Pause + Retry sonst) — analog zum
+  WiC64-Fix. Gleichzeitig im CPC-Client vorsorglich mitgefixt, da
+  strukturell identischer Code (gleiches `/join`-Antwortformat).
 - **HTTP-Session-Race-Condition:** Ein `/tick`, das genau beim Spielende
   eintrifft, muss noch Zeit haben, das `END`+`STATS` abzuholen, bevor die
   Session serverseitig aufgeräumt wird. Lösung: 15 Sekunden Gnadenfrist
@@ -194,6 +209,40 @@ zu erreichen:
   Einzelabrufe — falls der obige Fix das Problem nicht vollständig löst,
   hier als Nächstes ansetzen (z.B. Pacing/Delay zwischen `/tick`-Aufrufen
   testen).
+
+## UI-Vereinfachung aller Clients (2026-09-12)
+
+Nach dem Meatloaf-Hardwaretest vom 2026-09-12 (siehe Session-Mismatch-Fund
+oben) — dort zeigte sich außerdem, dass die ASCII-Kunst-Anzeige auf dem
+C64 nicht korrekt dargestellt wurde — wurden alle vier Clients
+(`tron_atari_client.bas`, `tron_c64_client.bas`,
+`tron_c64_wic64_client.bas`, `tron_cpc_client.bas`) bewusst radikal
+vereinfacht:
+
+- **Entfernt, in allen vier Clients:**
+  - Die ASCII-Kunst-Digitalisierung des Besucherfotos (Subroutine `3000`
+    je Client, inkl. des HTTP/`|HTTPMEM`/`SYS49152`-Abrufs von
+    `ascii-terminal.txt`).
+  - Der zeichenweise "Terminal-Tippeffekt" beim Ausgeben von Text
+    (Subroutine `4000` je Client).
+  - Die MCP-Storyline (`"MCP:> ..."`-Texte wie "WELCOME TO THE GRID",
+    "MASTER CONTROL PROGRAM SEARCH PHOTO", "YOU'VE GRANTED ACCESS...").
+- **Übrig bleibt eine knappe, rein funktionale Textausgabe** (direktes
+  `PRINT`, kein Zwischenschritt mehr über `tx$`+`GOSUB`): PIN-Abfrage
+  (`"ENTER YOUR PIN OR PRESS ENTER:"`), Verbindungsaufbau
+  (`"CONNECTING..."`), Warten auf Gegner (`"WAITING FOR OPPONENT..."`),
+  Joystick-Hinweis (`"USE JOYSTICK"`), Spielende + Ergebnis
+  (`"GAME OVER"` + die rohe Server-Antwortzeile), und Neustart
+  (`"RESTARTING..."`).
+- **Nicht betroffen:** Das serverseitige Foto-Feature (Besucherfoto im
+  pygame-Seitenpanel) bleibt unverändert — das ist komplett serverseitig
+  (`fetch_photo_ftp_blocking`/`fetch_photo_http`) und unabhängig von der
+  jetzt entfernten Client-seitigen ASCII-Vorschau. Die PIN wird weiterhin
+  ganz normal an `/join` bzw. `HELLO` mitgegeben.
+- **Warum:** Weniger Code pro Client bedeutet weniger Fläche für genau
+  die Art von Bugs, die dieses Projekt bisher am meisten Zeit gekostet
+  hat (siehe Lektionen oben) — und ein kaputter Digitalisierungs-Screen
+  ist auf einer Ausstellung schlechter als gar keiner.
 
 ## Allgemeine, plattformübergreifende Muster
 
@@ -432,8 +481,11 @@ Zum Testen bereits benutzte Besucher-PINs: `0001`, `0002`, `4711`,
 **Fertiges Test-Fixture:** [`assets/test_ftproot/`](./assets/test_ftproot/)
 enthält ein Demo-Foto (`photo.jpg`) und eine ASCII-Kunst-Datei
 (`ascii-terminal.txt`) unter der PIN `MUSTER`, heruntergeladen vom echten
-`fotofix.classic-computing.de`-Server. Einfach den pyftpdlib-Befehl oben
-aus `assets/test_ftproot/` heraus starten und mit PIN `MUSTER` testen,
+`fotofix.classic-computing.de`-Server. `ascii-terminal.txt` wird seit der
+Client-Vereinfachung vom 2026-09-12 von keinem Client mehr abgerufen,
+bleibt aber als Fixture liegen (harmlos, minimaler Pflegeaufwand). Einfach
+den pyftpdlib-Befehl oben aus `assets/test_ftproot/` heraus starten und
+mit PIN `MUSTER` testen,
 statt eigene Testbilder anzulegen.
 
 ## Ideen für später
@@ -481,11 +533,19 @@ statt eigene Testbilder anzulegen.
 ## Aktueller Stand (siehe auch git log für Details)
 
 - **Server**: stabil, produktiv im Einsatz getestet über viele Spiele.
-- **Atari-Client**: stabil, inkl. ASCII-Kunst-Digitalisierungseffekt.
-- **C64-Client (Meatloaf)**: stabil.
-- **CPC-Client**: stabil, inkl. ASCII-Kunst.
-- **C64-Client (WiC64)**: experimentell, erster Test zeigt Fortschritt
-  (ASCII-Kunst funktioniert). Spielverbindung (`/join`/`/tick`) hatte einen
-  Bug (URL-Großschreibung + fehlende Antwort-Prüfung), Fix am 2026-09-11
-  eingebaut, aber noch nicht auf echter Hardware verifiziert — siehe
-  Fix-Eintrag oben.
+- **Alle vier Clients** (Atari, C64/Meatloaf, C64/WiC64, CPC): am
+  2026-09-12 UI-seitig radikal vereinfacht — ASCII-Kunst-Anzeige,
+  Terminal-Tippeffekt und MCP-Storyline entfernt, siehe Abschnitt
+  "UI-Vereinfachung aller Clients" oben. Noch nicht auf allen vier
+  Plattformen nach dieser Vereinfachung erneut auf Hardware verifiziert.
+- **Atari-Client**: bisher stabil (vor der Vereinfachung).
+- **C64-Client (Meatloaf)**: Session-Mismatch-Bug (ungeprüfte
+  Join-Antwort) am 2026-09-12 auf echter Hardware gefunden und gefixt,
+  siehe Lektion oben — Fix noch nicht erneut auf Hardware verifiziert.
+- **CPC-Client**: bisher stabil (vor der Vereinfachung); denselben
+  Join-Antwort-Fix wie beim Meatloaf-Client vorsorglich mitbekommen.
+- **C64-Client (WiC64)**: experimentell, keine physische Hardware
+  vorhanden (siehe "Ideen für später"/Testcheckliste). Spielverbindung
+  (`/join`/`/tick`) hatte einen Bug (URL-Großschreibung + fehlende
+  Antwort-Prüfung), Fix am 2026-09-11 eingebaut, weiterhin nicht auf
+  echter Hardware verifiziert.
