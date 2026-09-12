@@ -455,6 +455,22 @@ statt eigene Testbilder anzulegen.
   bisherige Plattform. Kein Apple II in der eigenen Hardware-Sammlung
   bisher — reine Nice-to-have-Idee, keine Priorität vor CC2026.
   Quickstart: <https://github.com/FujiNetWIFI/fujinet-firmware/wiki/Apple-II-&-III-FujiNet-Quickstart-Guide>
+- **Fünfte Plattform: TI-99/4A via PicoPEB (ebenfalls nur bei Zeitüberschuss):**
+  PicoPEB ist eine DIY-Nachbildung der TI-Peripheral-Expansion-Box auf
+  Basis eines Raspberry Pi Pico W und emuliert u.a. ein RS232-Gerät mit
+  einem reinen Client-TCP-Socket (`PI.TCP=...` in der `autoload.cfg`) —
+  von TI BASIC/Extended BASIC aus per `OPEN #1:"RS232/2..."` (bzw. der
+  `PI.TCP`-Variante) und `PRINT #1:`/`INPUT #1:` angesprochen, vom Prinzip
+  her wie das serielle `N:`-Device beim Atari. Würde also ebenfalls auf
+  Methode 1 (rohes TCP, Port 6502) abgebildet, ohne Server-Änderung.
+  Genaue `OPEN`-Syntax fürs TCP-Client-Socket war in der verfügbaren
+  Doku nicht vollständig spezifiziert — reine Hands-on-Ermittlung auf
+  echter Hardware wie bei jeder bisherigen Plattform. Zusätzliche Hürden:
+  PicoPEB ist eine Lötbausatz-Platine (inkl. SMD-Bauteile), stock TI
+  BASIC ist langsam/string-limitiert (vermutlich Extended-BASIC-Modul
+  nötig), und es ist kein TI-99/4A in der eigenen Hardware-Sammlung
+  vorhanden — reine Nice-to-have-Idee, keine Priorität vor CC2026.
+  Doku: <https://github.com/hexbus/ppebcr-docs>
 
 ## Aktueller Stand (siehe auch git log für Details)
 
