@@ -247,6 +247,52 @@ Im BASIC-Interpreter lässt sich das Programm per Rechtsklick einfügen
 ("Paste"), dann abspeichern. Das fertige Disk-Image anschließend auf die
 echte SD-Karte des FujiNet übertragen.
 
+#### Alternative für Automatisierung: `.atr`-Images direkt bearbeiten (noch nicht getestet)
+
+Der Weg oben (Altirra-Paste) ist für einzelne, manuelle Übertragungen
+gedacht. Für ein automatisiertes Skript/Pipeline-Setup auf Ubuntu gibt es
+mehrere Kommandozeilen-Tools, die `.atr`-Images direkt bearbeiten können
+— normale Linux-Tools wie `mtools` funktionieren hier NICHT, weil Atari-
+Dateisysteme (DOS 2.0, DOS 2.5, MyDOS, SpartaDOS) kein FAT sind:
+
+- **[atrfs](https://github.com/pcrow/atari_8bit_utils)** — mountet ein
+  `.atr`-Image per FUSE als normales Ubuntu-Verzeichnis (kein Root
+  nötig), danach normales `cp`/Dateimanager möglich:
+  ```
+  mkdir ./atari_disk
+  atrfs --name=game_disk.atr ./atari_disk
+  cp myprog.bas ./atari_disk/
+  fusermount -u ./atari_disk
+  ```
+  Unterstützt DOS 2.0/LiteDOS vollständig, MyDOS/SpartaDOS mit
+  Einschränkungen.
+- **franny** — Kommandozeilen-Tool zum Auflisten/Extrahieren/Einfügen
+  ohne Mounten, u.a. für Skripte geeignet: `franny -l image.atr`
+  (Inhalt auflisten), `franny -g image.atr ATARIFILE.BAS localfile.bas`
+  (extrahieren), `franny -a image.atr localfile.bas ATARIFILE.BAS`
+  (einfügen). Kann auch neue Leer-Images erzeugen.
+- **[atari-tools](https://github.com/jhallen/atari-tools)** von Joseph
+  Allen — kompiliert schnell per `make`, liefert ein `atr`-Binary:
+  `atr image.atr ls` (auflisten), `atr image.atr put file.txt`
+  (einfügen).
+- **GUI-Alternative:** Altirra hat unter System → Disk Drives → Select
+  Drive → Explore einen Disk-Explorer, in den sich Dateien direkt vom
+  Ubuntu-Desktop hinein-draggen lassen (inkl. optionaler
+  Zeilenenden-Konvertierung) — auch `atari800` (`sudo apt install
+  atari800`) hat einen nativen Linux-Emulator als Alternative zu
+  Altirra/Wine.
+
+**Wichtig bei reinen ASCII-`.bas`-Textdateien:** Der Atari erwartet
+ATASCII-Zeilenenden — ein einzelnes `CR` (`\r`, ASCII 155), NICHT Linux-
+`LF` (`\n`) oder Windows-`CRLF` (`\r\n`). Falls eine skriptgenerierte
+`.bas`-Datei beim Laden (`ENTER "D:MYPROG.BAS"`) nicht sauber läuft,
+vorher die Zeilenenden mit `awk`/`sed` auf `\r` umwandeln.
+
+**Status:** Aus einer KI-Recherche übernommen, **noch nicht ausprobiert**
+— nützlich als Ausgangspunkt, falls das manuelle Altirra-Paste durch ein
+Skript ersetzt werden soll (z.B. für automatisiertes Ausrollen neuer
+Client-Stände auf mehrere FujiNet-SD-Karten).
+
 ### Commodore 64 (Meatloaf)
 
 VICE installieren — enthält `petcat`, das eine Text-Datei als Tokens
