@@ -49,17 +49,27 @@ zu erreichen:
   empfängt `start`. **Konsequenz:** Jeder String-Vergleich auf Client- UND
   Server-Seite muss das tolerieren (siehe `session_id.upper()` im Server,
   und die doppelten `="start" OR ="START"`-Prüfungen im C64-Client).
-- **Joystick-Port:** Beide C64-Clients (Meatloaf und WiC64) lesen den
-  Joystick jetzt aus **Port 1** (`PEEK(56321)`, CIA#1 Port B, `$DC01`) —
-  vorher wurde Port 2 (`PEEK(56320)`, `$DC00`) verwendet, was auf dem C64
-  zwar der übliche Default ist (Port 2 teilt sich keine Leitungen mit der
-  Tastaturmatrix, Port 1 schon), aber nicht der gewünschten Konvention
-  "alle Clients nutzen den ersten Joystick-Port ihres jeweiligen Rechners"
-  entspricht. **Achtung:** Da Port 1 (`$DC01`) dieselben Leitungen wie die
-  Tastaturmatrix-Zeilen nutzt, kann gleichzeitiges Tastendrücken theoretisch
-  Phantom-Joystick-Signale erzeugen ("Ghosting") — im aktuellen Client wird
-  während des Spiels aber nicht per Tastatur gelesen, daher in der Praxis
-  bisher kein beobachtetes Problem. Falls doch: erster Verdacht hier.
+- **Joystick-Port: zurück auf Port 2 (2026-09-14, endgültig) —
+  C64-spezifische Ausnahme von der "erster Joystick-Port"-Konvention:**
+  Beide C64-Clients lasen den Joystick eine Zeit lang aus Port 1
+  (`PEEK(56321)`, CIA#1 Port B, `$DC01`), um plattformübergreifend
+  konsistent "immer den ersten Joystick-Port" zu nutzen. Port 1 teilt sich
+  aber `$DC01` mit dem KERNAL-Tastatur-Scan (läuft per IRQ 60x/Sek. im
+  Hintergrund, unabhängig vom BASIC-Programm) — das theoretische
+  "Ghosting"-Risiko wurde am 2026-09-14 auf echter Hardware real
+  beobachtet (siehe PIN-Eingabe-Lektion weiter unten: ein
+  Phantom-Tastendruck verfälschte die PIN-Abfrage nach einem Neustart).
+  **Fix:** beide C64-Clients lesen den Joystick jetzt wieder aus **Port 2**
+  (`PEEK(56320)`, CIA#1 Port A, `$DC00`) — Bit-Layout identisch zu Port 1
+  (Bit 0-3 = Up/Down/Left/Right, aktiv-low), nur die Peek-Adresse ändert
+  sich. Port 2 teilt sich keine Leitungen mit der Tastaturmatrix, ist
+  deshalb ghosting-frei. **Konsequenz:** Die C64-Clients (Meatloaf UND
+  WiC64) sind damit eine bewusste, dokumentierte Ausnahme von der
+  "gleicher Joystick-Port auf jeder Plattform"-Konvention (siehe
+  Muster 7 unten) — Zuverlässigkeit auf der Ausstellung hat Vorrang vor
+  Konsistenz. Betrifft nur das Lesen des Joysticks in der Hauptschleife;
+  die PIN-Eingabe-Validierung (Längen-/Leerzeichen-Check, siehe unten)
+  bleibt zusätzlich als zweite Absicherung bestehen.
 - **`TI` ist eine reservierte Systemvariable** (Jiffy-Uhr) in Commodore
   BASIC — genau wie `PI` beim CPC (siehe unten) darf sie nicht als eigener
   Variablenname verwendet werden. Symptom: `?SYNTAX ERROR` an einer Stelle,
@@ -85,6 +95,31 @@ zu erreichen:
   die ID weiterverwendet wird (kurze Pause + Retry sonst) — analog zum
   WiC64-Fix. Gleichzeitig im CPC-Client vorsorglich mitgefixt, da
   strukturell identischer Code (gleiches `/join`-Antwortformat).
+- **Port-1-Joystick kann die PIN-Eingabe verfaelschen (2026-09-14, auf
+  echter Hardware gefunden):** Joystick Port 1 haengt am selben CIA1-Register
+  ($DC01/56321), das der KERNAL-Tastatur-Scan (laeuft per IRQ 60x/Sek. im
+  Hintergrund, unabhaengig vom BASIC-Programm) zum Auslesen der
+  Tastaturmatrix-Zeilen benutzt. Steht der Joystick in Port 1, kann das
+  theoretisch (siehe Joystick-Port-Lektion oben) einen Phantom-Tastendruck
+  erzeugen — beobachtet wurde ein Phantom-Cursor-Up+RETURN genau waehrend
+  der `INPUT PI$`-PIN-Abfrage nach einem Neustart. Der C64-Bildschirmeditor
+  behandelt beim `INPUT`-Befehl die aktuelle Bildschirmzeile als Eingabe:
+  landet der Cursor per Phantom-Tastendruck auf der bereits ausgegebenen
+  Prompt-Zeile ("enter your pin or press enter:") und feuert dort ein
+  Phantom-RETURN, wird die Prompt-Zeile selbst als PIN eingelesen und an
+  `/join` geschickt (Server-Log zeigt dann exakt den Prompt-Text als PIN;
+  Symptom fuer den Spieler: der Foto-Abruf schlaegt mit 404 fehl). **Das
+  eigentliche Steuern ist NICHT betroffen** — die Hauptschleife liest den
+  Joystick per direktem `PEEK`, nie ueber den (von diesem Bug betroffenen)
+  Tastatur-/Bildschirm-Eingabepfad. **Fix (zwei Ebenen):** (1) `pi$` nach
+  dem `INPUT` auf Laenge (>10 Zeichen) und Leerzeichen pruefen, im
+  Verdachtsfall auf `""` (→ `"NONE"`) zuruecksetzen — in
+  `tron_c64_client.bas` UND `tron_c64_wic64_client.bas`. (2) Root Cause
+  behoben: beide Clients lesen den Joystick seit 2026-09-14 aus **Port 2**
+  statt Port 1 (siehe Joystick-Port-Lektion oben) — vermeidet den
+  Leitungskonflikt komplett, statt nur dessen Symptom abzufangen. Der
+  PIN-Laengen-/Leerzeichen-Check bleibt trotzdem als zweite, billige
+  Absicherung im Code.
 - **HTTP-Session-Race-Condition:** Ein `/tick`, das genau beim Spielende
   eintrifft, muss noch Zeit haben, das `END`+`STATS` abzuholen, bevor die
   Session serverseitig aufgeräumt wird. Lösung: 15 Sekunden Gnadenfrist
@@ -189,17 +224,73 @@ zu erreichen:
   **Nächster Schritt:** auf echter Hardware testen — falls das
   `/tick`-Problem weiterhin auftritt, zeigt die neue Debug-Ausgabe jetzt
   wenigstens die rohe Serverantwort statt im Dunkeln zu tappen.
-- Ladetrick: Nach `LOAD"FOTOFIX.C000",8,1` stoppt das BASIC-Programm
-  (Standardverhalten bei `LOAD` aus einem laufenden Programm heraus).
-  Der klassische Trick, das zu umgehen: `POKE631,82:POKE632,85:
-  POKE633,78:POKE634,13:POKE198,4` (schreibt "RUN"+Return in den
-  Tastaturpuffer) direkt vor dem `LOAD`. Erkennung "ist der Treiber schon
-  geladen" per `PEEK(49152)=32` (erstes Byte der Routine, eine normale
-  BASIC-Variable würde ein `RUN` nicht überleben).
+- Ladetrick: Nach `LOAD"fotofix.c000",8,1` stoppt das BASIC-Programm
+  (Standardverhalten bei `LOAD` aus einem laufenden Programm heraus, auch
+  wenn der Load fehlschlägt — ein `FILE NOT FOUND` ist ein normaler
+  BASIC-Laufzeitfehler und stoppt genauso). Der klassische Trick, das zu
+  umgehen: `POKE631,82:POKE632,85:POKE633,78:POKE634,13:POKE198,4`
+  (schreibt "RUN"+Return in den Tastaturpuffer) direkt vor dem `LOAD`.
+  Erkennung "ist der Treiber schon geladen" per `PEEK(49152)=32` (erstes
+  Byte der Routine, eine normale BASIC-Variable würde ein `RUN` nicht
+  überleben).
+- **`petcat` tokenisiert Grossbuchstaben in String-Literalen als
+  "shifted" PETSCII (128+), nicht als das erwartete unshiftete PETSCII —
+  das bricht `LOAD`/`SAVE`-Dateinamen (2026-09-14, auf echter Hardware
+  gefunden, per Byte-Vergleich gegen das echte Disk-Verzeichnis
+  bestätigt):** Die alte Annahme "Textinhalte in Anführungszeichen bleiben
+  unberührt, egal welche Schreibweise" (siehe darunter) ist **so nicht
+  richtig** — sie stimmt nur für Text, der NACH einem Wechsel in den
+  Kleinbuchstaben-Zeichensatz (`CHR$(14)`) angezeigt wird (dort rendern
+  die "shifted"-Codes 193-218 tatsächlich als lesbare Grossbuchstaben).
+  Für alles, was auf EXAKTE Byte-Werte ankommt — allen voran ein
+  `LOAD`/`SAVE`-Dateiname, der 1:1 gegen den Diskettenverzeichnis-Eintrag
+  verglichen wird — ist sie falsch: `tron_c64_wic64_client.bas` schrieb
+  `LOAD"FOTOFIX.C000",8,1` (Grossbuchstaben im Quelltext), petcat
+  tokenisierte das zu den Byte-Werten 198,207,212,207,198,201,216,...
+  (= Buchstabe+128), waehrend das echte Disk-Verzeichnis (verifiziert per
+  `c1541 -dir` und direktem Parsen der D64-Verzeichnis-Sektoren) den
+  Dateinamen mit den PLAIN/unshifteten Werten 70,79,84,79,70,73,88,...
+  speichert. Ergebnis: `LOAD` findet die Datei NIE — dieselben
+  Bytewerte rendern zudem im Default-Zeichensatz (der beim `LOAD`, VOR
+  dem `CHR$(14)`-Wechsel, noch aktiv ist) als Grafiksymbole statt Text,
+  daher der Eindruck "Garbage in Zeile 30" beim `LIST`en. **Symptom beim
+  Testen:** Auto-Load des Treibers schlägt fehl, Betroffene mussten den
+  `LOAD`-Befehl manuell am READY-Prompt eintippen, bevor sie das
+  Hauptprogramm starten konnten — und weil der Treiber dann NIE regulär
+  automatisch lädt, bleiben nachfolgende `SYS49152`-Aufrufe im
+  Kaltstart-Fall wirkungslos (Client "verbindet", tut danach aber nichts
+  sichtbares mehr). **Fix:** Dateinamen fuer `LOAD`/`SAVE` IMMER in
+  Kleinschreibung in den Quelltext schreiben (`"fotofix.c000"` statt
+  `"FOTOFIX.C000"`) — das ergibt die unshifteten Byte-Werte, die zum
+  Diskettenverzeichnis passen. Per petcat-Testlauf bestaetigt: die
+  tokenisierten Bytes von `"fotofix.c000"` matchen exakt die echten
+  Verzeichnis-Bytes aus `fotofix.d64`.
 - **`petcat` will Befehle/Variablennamen in Kleinschreibung** — sonst
-  Tokenisierungsfehler. Textinhalte in Anführungszeichen bleiben davon
-  unberührt (bleiben in der Schreibweise, mit der sie angezeigt werden
-  sollen).
+  Tokenisierungsfehler. Reiner Anzeige-Text in Anführungszeichen (der NACH
+  dem `CHR$(14)`-Zeichensatzwechsel ausgegeben wird) darf in der
+  gewünschten Anzeige-Schreibweise bleiben — **Ausnahme:
+  Dateinamen für `LOAD`/`SAVE` müssen trotzdem klein geschrieben werden**,
+  siehe Lektion direkt darüber.
+- **WiC64-Hauptschleife prüfte `START`/`END`/`ERR` nur in Grossschreibung
+  — Client blieb bei laufendem Spiel "stumm" (2026-09-14, auf echter
+  Hardware gefunden):** Die Join-Antwort-Prüfung akzeptierte von Anfang an
+  sowohl `SESSION` als auch `session` (siehe Fix-Eintrag oben), die
+  Haupschleife (`tron_c64_wic64_client.bas`, Prüfungen auf `START`/`END`/
+  `ERR`) aber nur die Grossschreibung. Da genau derselbe Treiber/dieselbe
+  Verbindung nachweislich auch abgehende Texte in Kleinschreibung
+  verwandelt (siehe Fix oben — Server-Log zeigt ankommende Requests
+  durchgehend klein geschrieben, obwohl der Client-Code Grossschreibung
+  verwendet), ist es sehr wahrscheinlich, dass auch ankommende
+  Serverantworten kleingeschrieben ankommen — die reinen
+  Grossschreibungs-Vergleiche haetten dann NIE gegriffen. Symptom auf
+  Hardware: Client verbindet, zeigt "waiting for opponent...", aber selbst
+  nachdem ein zweiter Spieler beigetreten ist und die Partie serverseitig
+  läuft/endet, bleibt der Bildschirm unveraendert (kein "use joystick",
+  kein "game over") — Server-Log zeigt derweil endloses `/tick`-Polling
+  mit Richtung `n` weit über das Spielende hinaus. **Fix:** `START`/`END`/
+  `ERR`-Pruefungen in der Hauptschleife akzeptieren jetzt beide
+  Schreibweisen, analog zum bereits vorhandenen `SESSION`/`session`-Muster
+  bei der Join-Antwort.
 - **"`/join` ok, `/tick` = 'ERR UNKNOWN SESSION'"-Bug:** siehe Fix-Eintrag
   weiter oben (Großschreibung der URLs + fehlende Prefix-Prüfung der
   Join-Antwort) — auf Hardware noch zu verifizieren.
@@ -273,11 +364,16 @@ vereinfacht:
    Grenze — Atari ~120 Zeichen, C64/CPC deutlich lockerer). Ein kleines
    Python-Skript dafür lohnt sich, siehe Beispiel unten.
 7. **Konvention: Alle Clients nutzen den ersten Joystick-Port ihres
-   Rechners.** Atari (`STICK(JSPORT)` mit `JSPORT=0`) und CPC (`JOY(0)`)
-   waren von Anfang an korrekt. Beim C64 (Meatloaf UND WiC64) musste das
-   umgestellt werden — vorher wurde `PEEK(56320)`/`$DC00` (Port 2, der
-   auf dem C64 sonst übliche Default) gelesen, jetzt `PEEK(56321)`/`$DC01`
-   (Port 1).
+   Rechners — mit einer bewussten, dokumentierten Ausnahme für den C64.**
+   Atari (`STICK(JSPORT)` mit `JSPORT=0`) und CPC (`JOY(0)`) nutzen von
+   Anfang an korrekt ihren jeweils ersten Port. Der C64 (Meatloaf UND
+   WiC64) wurde testweise auf Port 1 (`PEEK(56321)`/`$DC01`) umgestellt,
+   dann aber am 2026-09-14 wieder auf **Port 2** (`PEEK(56320)`/`$DC00`)
+   zurückgestellt — Port 1 teilt sich Leitungen mit der Tastaturmatrix und
+   erzeugte auf echter Hardware reale Phantom-Tastendrücke (siehe
+   Joystick-Port-Lektion und PIN-Eingabe-Lektion oben). Für den C64 hat
+   Zuverlässigkeit auf der Ausstellung Vorrang vor der reinen
+   Port-Nummern-Konsistenz zwischen den Plattformen.
 
 ```python
 # Schnelle BASIC-Zeilennummern-Konsistenzpruefung
