@@ -149,10 +149,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # =============================================================================
 # DEMO-SCROLLTEXT - LAEUFT DURCHS SPIELFELD, SOLANGE AUF SPIELER GEWARTET WIRD
 # =============================================================================
-SCROLL_TEXT = ("   RETRO TRON BATTLE *** "
-               "800XL, C64 AND CPC6128 ARE CLASSICAL HOME COMPUTER *** "
-               "WHICH ONE WILL WIN THE MOST BATTLES? *** "
-               "Video game warriors escaping game grid. This is an illegal exit. You must return to game grid. Repeat! This is an illegal exit. You must return to the grid.") # <-- EDIT: EIGENER TEXT
+SCROLL_TEXT = (" RETRO TRON BATTLE - RTB on the CLASSIC COMPUTING 2026 *** PLAY TOGETHER TRON ON OLD HOMECOMPUTERS *** EVERY MATCH COUNTS!") # <-- EDIT: EIGENER TEXT
 SCROLL_FONT_PATH = os.path.join(BASE_DIR, "assets/font/Flynn-4v54.ttf")  # <-- EDIT: pfad zu einer eigenen .ttf-datei,
                                      # oder "" leer lassen fuer die standard-schrift
 SCROLL_SPEED = 4            # pixel pro frame (bei ~30fps)
@@ -637,6 +634,11 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
 # (StreamReader, StreamWriter).
 # =============================================================================
 http_sessions: dict = {}
+# Merkt sich Zeitpunkt (time.monotonic()) des Ablaufs kuerzlich entfernter
+# Sessions - reine Diagnose-Hilfe fuer "gesuchte session NICHT gefunden":
+# unterscheidet "session ist wirklich abgelaufen" von "hat nie existiert"
+# (z.B. wegen einer verstuemmelten Join-Antwort clientseitig).
+recently_expired_sessions: dict = {}
 
 
 class HTTPPlayerConn:
@@ -696,6 +698,7 @@ class HTTPPlayerConn:
     def _expire(self):
         if self.session_id and http_sessions.get(self.session_id) is self:
             del http_sessions[self.session_id]
+            recently_expired_sessions[self.session_id] = time.monotonic()
 
     def get_extra_info(self, *a, **k):
         return None
@@ -745,8 +748,11 @@ async def http_handle_request(path: str) -> str:
         direction = segments[2].upper() if len(segments) > 2 else "N"
         conn = http_sessions.get(session_id)
         if conn is None:
-            print(f"[http] TICK: gesuchte session {session_id!r} NICHT gefunden. "
-                  f"aktuelle keys: {list(http_sessions.keys())!r}")
+            expired_ago = recently_expired_sessions.get(session_id)
+            reason = (f"vor {time.monotonic() - expired_ago:.1f}s abgelaufen"
+                      if expired_ago is not None else "hat hier nie existiert")
+            print(f"[http] TICK: gesuchte session {session_id!r} NICHT gefunden "
+                  f"({reason}). aktuelle keys: {list(http_sessions.keys())!r}")
             return "ERR UNKNOWN SESSION"
         if direction in HTTP_DIR_MAP:
             conn.feed_line(HTTP_DIR_MAP[direction])
