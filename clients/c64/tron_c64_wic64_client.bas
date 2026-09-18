@@ -5,12 +5,18 @@
 32 rem    nutzt aber unshiftetes petscii - load faende die datei sonst nie.
 33 load"fotofix.c000",8,1
 40 poke55,254:poke56,31:clr:sys50497
+41 rem -- winziger cli+rts-stub im kassettenpuffer (immer freies ram):
+42 rem    zwingt interrupts wieder an, falls sys49152 sie deaktiviert
+43 rem    laesst (deshalb blieb der joystick auf port 2 immer 0 -
+44 rem    port 2 braucht den kernal-tastatur-scan-irq, um sich zwischen
+45 rem    abfragen in den ruhezustand zurueckzusetzen).
+46 poke828,88:poke829,96
 50 rem -- neustart-punkt nach jedem spiel (laden/init nur einmal) --
 60 print chr$(147);chr$(14);chr$(18)
 70 for i=1 to 40:print" ";:next i:print
 80 print"   RETRO TRON BATTLE -"
 90 print"   CLASSIC COMPUTING 2026"
-100 print"     COMMODORE 64 / WIC64 EDITION - BUILD 5"
+100 print"     COMMODORE 64 / WIC64 EDITION - BUILD 7"
 110 for i=1 to 40:print" ";:next i:print
 120 print chr$(146):print
 130 ho$="192.168.17.158":rem <-- edit: server ip
@@ -56,6 +62,10 @@
 560 if(jand4)<>0thennd$="L"
 570 if(jand8)<>0thennd$="R"
 580 ifnd$<>"N"thendr$=nd$
+585 rem -- temporaere diagnose: zeigt rohen joystickwert + ermittelte
+586 rem    richtung, um zu pruefen ob das problem beim lesen oder erst
+587 rem    bei der uebertragung durch den treiber liegt. spaeter entfernen.
+588 printchr$(19);"j=";j;" dir=";dr$;"      "
 590 u$="http://"+ho$+":"+po$+"/tick/"+sn$+"/"+dr$
 600 gosub2000
 610 ifr$=""then500
@@ -75,6 +85,7 @@
 2001 rem    wiederverwendete fotofix.c000-treiberroutine (sys49152). --
 2010 fori=0to199:pokeda+i,0:nexti
 2020 sys49152,u$,da
+2025 sys828:rem cli-stub - siehe kommentar bei zeile 41
 2030 if 1 and peek(783) then r$="":return
 2040 r$=""
 2050 fori=0to199

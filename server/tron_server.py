@@ -152,7 +152,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCROLL_TEXT = (" RETRO TRON BATTLE - RTB on the CLASSIC COMPUTING 2026 *** PLAY TOGETHER TRON ON OLD HOMECOMPUTERS *** EVERY MATCH COUNTS!") # <-- EDIT: EIGENER TEXT
 SCROLL_FONT_PATH = os.path.join(BASE_DIR, "assets/font/Flynn-4v54.ttf")  # <-- EDIT: pfad zu einer eigenen .ttf-datei,
                                      # oder "" leer lassen fuer die standard-schrift
-SCROLL_SPEED = 4            # pixel pro frame (bei ~30fps)
+SCROLL_SPEED = 2            # pixel pro frame (bei ~30fps)
 SCROLL_FONT_SIZE = 180       # schriftgroesse in pixel - 64=doppelt, 96=dreifach
 SCROLL_WAVE_AMPLITUDE = 120  # pixel, hoehe der sinuswelle
 SCROLL_WAVE_FREQ = 0.10      # radiant pro zeichen, "enge" der welle
