@@ -300,6 +300,39 @@ zu erreichen:
   Einzelabrufe — falls der obige Fix das Problem nicht vollständig löst,
   hier als Nächstes ansetzen (z.B. Pacing/Delay zwischen `/tick`-Aufrufen
   testen).
+  - **Erste Messung (2026-09-19):** Beantwortet die obige Frage zumindest
+    teilweise — mit dem neuen `[tick-latency]`-Logging (siehe
+    `HTTPPlayerConn.last_tick_at` in `server/tron_server.py`) lag die
+    Zeit zwischen aufeinanderfolgenden `/tick`-Aufrufen des WiC64-Clients
+    (VICE-Emulator, kein Bot als Gegner sondern ein echter TCP-Bot auf
+    Atari-Seite) durchgehend bei **1272–1290 ms** — bei `TICK_RATE=8`
+    (125 ms/Tick) also rund **10 Server-Ticks pro WiC64-Eingabe**. Die
+    enge Spanne (nur ~18 ms Streuung) spricht eher für einen festen,
+    deterministischen Overhead im WiC64-Protokoll/Treiber (User-Port-
+    Handshake mit dem ESP-Modul) als für reines Netzwerk-Jitter.
+    **Testumgebung:** Ubuntu Linux, Intel i5, 16 GB RAM, VICE aus dem
+    Git-Quellcode selbst kompiliert (nicht auf echter WiC64-Hardware
+    verifiziert — der Emulator könnte hier anders/langsamer als echte
+    Hardware timen). **Einordnung:** `TICK_RATE` deswegen NICHT global
+    absenken — das würde das Spiel für alle Plattformen verlangsamen,
+    allen voran Atari mit praktisch keiner Eingabe-Latenz, ohne WiC64
+    dadurch wirklich konkurrenzfähig zu machen. WiC64 bleibt der
+    experimentelle Bonus-Client, Meatloaf bleibt der verlässliche
+    Standard-C64-Client für CC2026.
+  - **Vergleichsmessung Meatloaf (2026-09-19, echtes Spiel gegen
+    `bots/tron_bot.sh`):** Im Steady State **294–306 ms** pro `/tick`
+    — rund **4x schneller als WiC64** (~1280 ms), aber immer noch gut
+    **2,4x langsamer als `TICK_RATE=8`** (125 ms/Tick) — auch der
+    "verlässliche" HTTP-Polling-Client bekommt also nur etwa alle 2-3
+    Server-Ticks eine neue Eingabe durch, nicht jeden. Einmalig ein
+    Ausreißer von 1444 ms beobachtet (Ursache unklar - GC-Pause,
+    OS-Scheduling-Jitter im Emulator, oder eine intern wiederholte
+    Anfrage - bisher einmalig, kein wiederkehrendes Muster). Bestätigt:
+    HTTP-Polling hat generell einen spürbaren Latenz-Sockel gegenüber
+    Atars rohem TCP, aber der ist bei Meatloaf offenbar akzeptabel
+    (Client gilt seit vielen echten Spielen als stabil) - WiC64s
+    ~1280 ms sind nochmal eine andere Größenordnung. CPC-Messung
+    weiterhin offen.
 
 ## UI-Vereinfachung aller Clients (2026-09-12)
 
@@ -677,5 +710,8 @@ statt eigene Testbilder anzulegen.
 - **C64-Client (WiC64)**: experimentell, keine physische Hardware
   vorhanden (siehe "Ideen für später"/Testcheckliste). Spielverbindung
   (`/join`/`/tick`) hatte einen Bug (URL-Großschreibung + fehlende
-  Antwort-Prüfung), Fix am 2026-09-11 eingebaut, weiterhin nicht auf
-  echter Hardware verifiziert.
+  Antwort-Prüfung), Fix am 2026-09-11 eingebaut. Am 2026-09-19 im
+  VICE-Emulator gegen einen TCP-Bot erfolgreich gespielt (funktioniert
+  grundsätzlich) — dabei aber eine `/tick`-Latenz von 1272–1290 ms
+  gemessen, siehe Detail-Eintrag oben im WiC64-Abschnitt. Weiterhin
+  nicht auf echter WiC64-Hardware verifiziert.
