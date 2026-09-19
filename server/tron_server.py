@@ -128,7 +128,7 @@ from datetime import datetime
 # =============================================================================
 # VERSION - increment on every content change (shown in console + window)
 # =============================================================================
-SERVER_BUILD = 8
+SERVER_BUILD = 9
 # =============================================================================
 
 # =============================================================================
@@ -619,6 +619,17 @@ async def read_line(reader: asyncio.StreamReader, timeout: float | None = None):
         return None
 
 
+def display_name_for(name: str, pin: str) -> str:
+    """Picks what to actually show as the player's name. Every client's own
+    configured name is really just a stand-in for the platform (e.g.
+    "SCHNEIDERCPC", "ATARIXL") - it doesn't distinguish one visitor from
+    the next on the same machine. The PIN does, so if a real one was given,
+    show that instead."""
+    if pin and pin.upper() not in ("NONE", "-"):
+        return pin
+    return name
+
+
 async def pair_and_maybe_start(platform: str, name: str, pin: str,
                                 reader: asyncio.StreamReader, writer: asyncio.StreamWriter,
                                 peer_desc: str = ""):
@@ -661,6 +672,7 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
     platform = parts[1].upper() if len(parts) > 1 else "UNKNOWN"
     name = parts[2] if len(parts) > 2 else platform
     pin = parts[3] if len(parts) > 3 else ""
+    name = display_name_for(name, pin)
 
     await pair_and_maybe_start(platform, name, pin, reader, writer, peer_desc=str(peer))
 
@@ -777,6 +789,7 @@ async def http_handle_request(path: str) -> str:
         platform = segments[1].upper()
         name = segments[2]
         pin = segments[3] if len(segments) > 3 and segments[3].upper() != "NONE" else ""
+        name = display_name_for(name, pin)
 
         session_id = uuid.uuid4().hex[:8].upper()
         conn = HTTPPlayerConn(session_id)
