@@ -1,12 +1,12 @@
 10 rem ===================================
 11 rem retro tron - c64 client (http-polling)
 12 rem server draws the board - this c64 just
-13 rem steert. nutzt das bestaetigt funktion-
-14 rem ierende meatloaf http-get-muster
-15 rem (geraet 8, sekundaeradresse 3) statt
-16 rem des unbestaetigten rohen sockets.
-17 rem joystick in port 2 (port 1 teilt sich leitungen mit der tastatur).
-18 rem ===== restart-punkt, per "run" erreicht (siehe unten) =====
+13 rem steers. uses the confirmed working
+14 rem meatloaf http-get pattern (device 8,
+15 rem secondary address 3) instead of the
+16 rem unconfirmed raw socket.
+17 rem joystick in port 2 (port 1 shares lines with the keyboard).
+18 rem ===== restart point, reached via "run" (see below) =====
 20 print chr$(147);chr$(14)
 21 print chr$(18);
 22 for i=1 to 40:print " ";:next i:print
@@ -17,15 +17,15 @@
 27 print chr$(146)
 28 print
 30 ho$="192.168.17.138":rem <-- edit: server ip
-40 po$="8080":rem <-- edit: http-bridge-port! (siehe server-startmeldung,
-41 rem     NICHT der tcp-spielport 6502 - die http-bridge laeuft separat)
-50 na$="COMMODORE64":rem <-- edit: dein spielername
+40 po$="8080":rem <-- edit: http bridge port! (see server startup message,
+41 rem     NOT the tcp game port 6502 - the http bridge runs separately)
+50 na$="COMMODORE64":rem <-- edit: your player name
 100 print "enter your pin or press enter:"
 110 input pi$
-111 rem -- port-1-joystick teilt sich die tastaturmatrix-leitungen; ein
-112 rem    phantom-tastendruck kann den cursor auf die obige textzeile
-113 rem    zuruecksetzen, so dass "input" den prompt-text selbst als pin
-114 rem    liest. laenge/leerzeichen-check faengt das ab.
+111 rem -- port-1 joystick shares lines with the keyboard matrix; a
+112 rem    phantom keypress can reset the cursor onto the prompt line
+113 rem    above, so that "input" reads the prompt text itself as the pin.
+114 rem    length/whitespace check catches that.
 115 bad=0:if len(pi$)>10 then bad=1:goto 118
 116 for pc=1 to len(pi$):if mid$(pi$,pc,1)=" " then bad=1
 117 next pc
@@ -36,7 +36,7 @@
 150 gosub 2000:rem http get -> r$
 160 if left$(r$,7)="session" or left$(r$,7)="SESSION" then 220
 170 for dl=1 to 3:for w=1 to 1500:next w:next dl:goto 140
-220 rem erste zeile "session <id>" extrahieren
+220 rem extract first line "session <id>"
 230 sp=1
 240 if mid$(r$,sp,1)=" " then 260
 250 sp=sp+1:if sp<=len(r$) then 240
@@ -67,17 +67,17 @@
 495 if left$(r$,5)<>"start" and left$(r$,5)<>"START" then 510
 496 print "use joystick - port 2":gs=1
 510 if left$(r$,3)<>"end" and left$(r$,3)<>"END" then 400
-520 rem -- spiel zu ende: ergebnis zeigen, dann neustart --
+520 rem -- game over: show result, then restart --
 521 print "game over":print r$
 525 print "restarting..."
-527 for dl=1 to 3:for w=1 to 1500:next w:next dl :rem ca. 3 sek, bei bedarf anpassen
+527 for dl=1 to 3:for w=1 to 1500:next w:next dl :rem ~3 sec, adjust if needed
 528 run
-560 if gs=0 then 400 :rem noch kein gegner - das darf beliebig lange dauern
+560 if gs=0 then 400 :rem no opponent yet - this is allowed to take as long as it wants
 561 ec=ec+1
 562 if ec>500 then print "no response - restarting...":run
 563 goto 400
 800 print "restarting...":run
-2000 rem -- http get u$ -> r$ (das bestaetigt funktionierende muster) --
+2000 rem -- http get u$ -> r$ (the confirmed working pattern) --
 2010 open 1,8,3,u$
 2020 r$=""
 2030 get#1,a$

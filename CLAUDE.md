@@ -1,681 +1,676 @@
-# CLAUDE.md — Kontext & Lektionen für dieses Projekt
+# CLAUDE.md — Context & lessons learned for this project
 
-Dieses Dokument richtet sich an jeden (KI-Assistent oder Mensch), der an
-diesem Projekt weiterarbeitet. Es fasst zusammen, was in der ursprünglichen
-Entwicklungssession (Claude, über mehrere Wochen) mühsam herausgefunden
-wurde — vieles davon ist auf keiner offiziellen Doku-Seite zu finden.
-**Bitte lesen, bevor du an den Clients herumschraubst — sonst wiederholst
-du wahrscheinlich Fehler, die schon gemacht und behoben wurden.**
+This document is for anyone (AI assistant or human) continuing work on
+this project. It summarizes what was painstakingly figured out during
+the original development session (Claude, over several weeks) — much
+of it isn't documented on any official reference page.
+**Please read before tinkering with the clients — otherwise you'll
+likely repeat mistakes that have already been made and fixed.**
 
-## Projektüberblick
+## Project overview
 
-Ein Tron/Lightcycle-Duell für eine Retro-Computing-Ausstellung, gebaut für
+A Tron/lightcycle duel for a retro-computing exhibition, built for
 [Classic Computing 2026](https://www.classic-computing.de/cc2026/) in
-Celle (10.–11. Oktober 2026, Halle 10 / CD-Kaserne). Drei echte
-Retro-Rechner (Atari XL/XE, Commodore 64, Schneider/Amstrad CPC) treten
-gegeneinander an. Ein Python-Server auf einem modernen PC übernimmt die
-komplette Spiellogik und zeichnet alles selbst (pygame-Fenster, gut für
-einen Beamer) — die Retro-Rechner steuern nur per Joystick.
+Celle (10–11 October 2026, Hall 10 / CD-Kaserne). Three real retro
+computers (Atari XL/XE, Commodore 64, Schneider/Amstrad CPC) face off
+against each other. A Python server on a modern PC handles the entire
+game logic and draws everything itself (pygame window, good for a
+projector) — the retro computers only steer via joystick.
 
-Jeder Retro-Rechner braucht ein passendes WiFi-Interface, um den Server
-zu erreichen:
+Each retro computer needs a matching WiFi interface to reach the
+server:
 
 - **Atari XL/XE:** [FujiNet](https://fujinet.online/)
-- **Commodore 64 (Standard-Client):** [Meatloaf](https://github.com/idolpx/meatloaf)
-- **Commodore 64 (experimenteller Client):** [WiC64](https://www.wic64.de/)
+- **Commodore 64 (standard client):** [Meatloaf](https://github.com/idolpx/meatloaf)
+- **Commodore 64 (experimental client):** [WiC64](https://www.wic64.de/)
 - **Schneider/Amstrad CPC:** [M4 Board](https://www.cpcwiki.eu/index.php/M4_Board)
 
-## Architektur in Kürze
+## Architecture in brief
 
-- **`server/tron_server.py`** — der einzige Server. Führt Spiellogik aus,
-  zeichnet das Spielfeld, verwaltet Fotos/Logos/Scrolltext/Statistik.
-  Der Haupt-Docstring im Code selbst ist die primäre Protokoll-Doku —
-  bei Änderungen am Protokoll dort zuerst nachschauen/aktualisieren.
-- **Zwei Teilnahme-Methoden**, je nach Hardware-Fähigkeit:
-  - **Rohes TCP** (Port 6502) — für Atari/FujiNet, das einen dauerhaften
-    Socket aus BASIC heraus offen halten kann.
-  - **HTTP-Polling** (Port 8080, Routen `/join` und `/tick`) — für C64
-    (Meatloaf) und Schneider CPC (M4), die das nicht zuverlässig können.
-- Beide Wege laufen serverseitig durch **dieselbe** `run_game()`-Logik.
+- **`server/tron_server.py`** — the one and only server. Runs the game
+  logic, draws the playfield, manages photos/logos/scroll text/stats.
+  The main docstring in the code itself is the primary protocol
+  documentation — check/update it first whenever the protocol changes.
+- **Two participation methods**, depending on hardware capability:
+  - **Raw TCP** (port 6502) — for Atari/FujiNet, which can keep a
+    persistent socket open from BASIC.
+  - **HTTP polling** (port 8080, routes `/join` and `/tick`) — for C64
+    (Meatloaf) and Schneider CPC (M4), which can't do that reliably.
+- Both paths run through **the same** `run_game()` logic server-side.
 
-## Die wichtigsten Lektionen (chronologisch nach Plattform)
+## The most important lessons (chronological by platform)
 
 ### Commodore 64 + Meatloaf
 
-- **PETSCII-Fallstrick (der wichtigste Fund im ganzen Projekt):**
-  Meatloaf wandelt beim Lesen über `GET#` empfangenen HTTP-Text-Inhalt
-  **tatsächlich in Kleinbuchstaben um** — keine reine Anzeige-Eigenart,
-  sondern eine echte Byte-Umwandlung. Server sendet z.B. `START`, C64
-  empfängt `start`. **Konsequenz:** Jeder String-Vergleich auf Client- UND
-  Server-Seite muss das tolerieren (siehe `session_id.upper()` im Server,
-  und die doppelten `="start" OR ="START"`-Prüfungen im C64-Client).
-- **Joystick-Port: zurück auf Port 2 (2026-09-14, endgültig) —
-  C64-spezifische Ausnahme von der "erster Joystick-Port"-Konvention:**
-  Beide C64-Clients lasen den Joystick eine Zeit lang aus Port 1
-  (`PEEK(56321)`, CIA#1 Port B, `$DC01`), um plattformübergreifend
-  konsistent "immer den ersten Joystick-Port" zu nutzen. Port 1 teilt sich
-  aber `$DC01` mit dem KERNAL-Tastatur-Scan (läuft per IRQ 60x/Sek. im
-  Hintergrund, unabhängig vom BASIC-Programm) — das theoretische
-  "Ghosting"-Risiko wurde am 2026-09-14 auf echter Hardware real
-  beobachtet (siehe PIN-Eingabe-Lektion weiter unten: ein
-  Phantom-Tastendruck verfälschte die PIN-Abfrage nach einem Neustart).
-  **Fix:** beide C64-Clients lesen den Joystick jetzt wieder aus **Port 2**
-  (`PEEK(56320)`, CIA#1 Port A, `$DC00`) — Bit-Layout identisch zu Port 1
-  (Bit 0-3 = Up/Down/Left/Right, aktiv-low), nur die Peek-Adresse ändert
-  sich. Port 2 teilt sich keine Leitungen mit der Tastaturmatrix, ist
-  deshalb ghosting-frei. **Konsequenz:** Die C64-Clients (Meatloaf UND
-  WiC64) sind damit eine bewusste, dokumentierte Ausnahme von der
-  "gleicher Joystick-Port auf jeder Plattform"-Konvention (siehe
-  Muster 7 unten) — Zuverlässigkeit auf der Ausstellung hat Vorrang vor
-  Konsistenz. Betrifft nur das Lesen des Joysticks in der Hauptschleife;
-  die PIN-Eingabe-Validierung (Längen-/Leerzeichen-Check, siehe unten)
-  bleibt zusätzlich als zweite Absicherung bestehen.
-- **`TI` ist eine reservierte Systemvariable** (Jiffy-Uhr) in Commodore
-  BASIC — genau wie `PI` beim CPC (siehe unten) darf sie nicht als eigener
-  Variablenname verwendet werden. Symptom: `?SYNTAX ERROR` an einer Stelle,
-  die beim genauen Hinsehen überhaupt nichts Verdächtiges enthält.
-  **Ist zweimal aufgetreten:** einmal ursprünglich, dann erneut am
-  2026-09-12 als `ti` Schleifenvariable in der Tippeffekt-Subroutine
-  (Zeile 4010, `tron_c64_client.bas`) — der WiC64-Client hat dieselbe
-  Subroutine, nennt die Variable dort aber bereits korrekt `tc`. Bei
-  neuem Code für diese Subroutine (oder Kopien davon) **immer `tc`
-  verwenden, nie `ti`**.
-- **Ungeprüfte Join-Antwort → Session-Mismatch (2026-09-12, auf echter
-  Hardware gefunden):** Der Meatloaf-Client extrahierte die Session-ID
-  aus der `/join`-Antwort rein positionsbasiert (erstes Leerzeichen bis
-  Zeilenende), ohne vorher zu prüfen, ob die Antwort überhaupt mit
-  `SESSION`/`session` beginnt — genau derselbe Bug, der beim WiC64-Client
-  schon einmal gefunden und dort bereits gefixt war (siehe WiC64-Abschnitt
-  unten), hier aber im Meatloaf-Client übersehen. Symptom auf Hardware:
-  Server-Log zeigt `/tick`-Aufrufe mit einer Session-ID, die serverseitig
-  nie existiert hat (`aktuelle keys: []`) — wirkt wie ein Groß-/
-  Kleinschreibungsproblem, ist aber eigentlich eine ungültige/leere
-  extrahierte ID aus einer nicht als Erfolg erkannten Antwort. **Fix:**
-  Join-Antwort wird jetzt auf `SESSION`/`session`-Prefix geprüft, bevor
-  die ID weiterverwendet wird (kurze Pause + Retry sonst) — analog zum
-  WiC64-Fix. Gleichzeitig im CPC-Client vorsorglich mitgefixt, da
-  strukturell identischer Code (gleiches `/join`-Antwortformat).
-- **Port-1-Joystick kann die PIN-Eingabe verfaelschen (2026-09-14, auf
-  echter Hardware gefunden):** Joystick Port 1 haengt am selben CIA1-Register
-  ($DC01/56321), das der KERNAL-Tastatur-Scan (laeuft per IRQ 60x/Sek. im
-  Hintergrund, unabhaengig vom BASIC-Programm) zum Auslesen der
-  Tastaturmatrix-Zeilen benutzt. Steht der Joystick in Port 1, kann das
-  theoretisch (siehe Joystick-Port-Lektion oben) einen Phantom-Tastendruck
-  erzeugen — beobachtet wurde ein Phantom-Cursor-Up+RETURN genau waehrend
-  der `INPUT PI$`-PIN-Abfrage nach einem Neustart. Der C64-Bildschirmeditor
-  behandelt beim `INPUT`-Befehl die aktuelle Bildschirmzeile als Eingabe:
-  landet der Cursor per Phantom-Tastendruck auf der bereits ausgegebenen
-  Prompt-Zeile ("enter your pin or press enter:") und feuert dort ein
-  Phantom-RETURN, wird die Prompt-Zeile selbst als PIN eingelesen und an
-  `/join` geschickt (Server-Log zeigt dann exakt den Prompt-Text als PIN;
-  Symptom fuer den Spieler: der Foto-Abruf schlaegt mit 404 fehl). **Das
-  eigentliche Steuern ist NICHT betroffen** — die Hauptschleife liest den
-  Joystick per direktem `PEEK`, nie ueber den (von diesem Bug betroffenen)
-  Tastatur-/Bildschirm-Eingabepfad. **Fix (zwei Ebenen):** (1) `pi$` nach
-  dem `INPUT` auf Laenge (>10 Zeichen) und Leerzeichen pruefen, im
-  Verdachtsfall auf `""` (→ `"NONE"`) zuruecksetzen — in
-  `tron_c64_client.bas` UND `tron_c64_wic64_client.bas`. (2) Root Cause
-  behoben: beide Clients lesen den Joystick seit 2026-09-14 aus **Port 2**
-  statt Port 1 (siehe Joystick-Port-Lektion oben) — vermeidet den
-  Leitungskonflikt komplett, statt nur dessen Symptom abzufangen. Der
-  PIN-Laengen-/Leerzeichen-Check bleibt trotzdem als zweite, billige
-  Absicherung im Code.
-- **HTTP-Session-Race-Condition:** Ein `/tick`, das genau beim Spielende
-  eintrifft, muss noch Zeit haben, das `END`+`STATS` abzuholen, bevor die
-  Session serverseitig aufgeräumt wird. Lösung: 15 Sekunden Gnadenfrist
-  nach `close()`, bevor die Session wirklich gelöscht wird
+- **PETSCII gotcha (the single most important finding in the whole
+  project):** Meatloaf **actually converts to lowercase** HTTP text
+  content received via `GET#` — not a display quirk, a real byte
+  conversion. Server sends e.g. `START`, C64 receives `start`.
+  **Consequence:** every string comparison on both the client AND
+  server side must tolerate this (see `session_id.upper()` on the
+  server, and the doubled `="start" OR ="START"` checks in the C64
+  client).
+- **Joystick port: back to port 2 (2026-09-14, final) — C64-specific
+  exception to the "first joystick port" convention:** both C64
+  clients read the joystick from port 1 (`PEEK(56321)`, CIA#1 Port B,
+  `$DC01`) for a while, to consistently use "always the first joystick
+  port" across platforms. But port 1 shares `$DC01` with the KERNAL
+  keyboard scan (runs via IRQ 60x/sec in the background, independent
+  of the BASIC program) — the theoretical "ghosting" risk was actually
+  observed on real hardware on 2026-09-14 (see the PIN-entry lesson
+  below: a phantom keypress corrupted the PIN prompt after a restart).
+  **Fix:** both C64 clients now read the joystick from **port 2**
+  again (`PEEK(56320)`, CIA#1 Port A, `$DC00`) — bit layout identical
+  to port 1 (bits 0-3 = up/down/left/right, active-low), only the peek
+  address changes. Port 2 shares no lines with the keyboard matrix, so
+  it's ghosting-free. **Consequence:** the C64 clients (Meatloaf AND
+  WiC64) are thus a deliberate, documented exception to the "same
+  joystick port on every platform" convention (see pattern 7 below) —
+  reliability at the exhibition takes priority over consistency. Only
+  affects reading the joystick in the main loop; the PIN-entry
+  validation (length/whitespace check, see below) stays in place as a
+  second layer of defense.
+- **`TI` is a reserved system variable** (jiffy clock) in Commodore
+  BASIC — just like `PI` on the CPC (see below), it can't be used as a
+  variable name. Symptom: `?SYNTAX ERROR` at a spot that, on close
+  inspection, contains nothing suspicious at all. **Happened twice:**
+  once originally, then again on 2026-09-12 as the `ti` loop variable
+  in the typing-effect subroutine (line 4010, `tron_c64_client.bas`) —
+  the WiC64 client has the same subroutine but already correctly calls
+  the variable `tc` there. For new code in this subroutine (or copies
+  of it), **always use `tc`, never `ti`**.
+- **Unchecked join response → session mismatch (2026-09-12, found on
+  real hardware):** the Meatloaf client extracted the session ID from
+  the `/join` response purely by position (first space to end of
+  line), without first checking whether the response actually starts
+  with `SESSION`/`session` — the exact same bug already found and
+  fixed once on the WiC64 client (see the WiC64 section below), but
+  overlooked here in the Meatloaf client. Symptom on hardware: server
+  log shows `/tick` calls with a session ID that never existed
+  server-side (`current keys: []`) — looks like a case-sensitivity
+  problem, but is actually an invalid/empty ID extracted from a
+  response that was never recognized as a success. **Fix:** the join
+  response is now checked for a `SESSION`/`session` prefix before the
+  ID gets used further (short pause + retry otherwise) — mirroring the
+  WiC64 fix. Preemptively applied to the CPC client at the same time,
+  since it's structurally identical code (same `/join` response
+  format).
+- **Port-1 joystick can corrupt the PIN entry (2026-09-14, found on
+  real hardware):** joystick port 1 hangs off the same CIA1 register
+  ($DC01/56321) that the KERNAL keyboard scan (runs via IRQ 60x/sec in
+  the background, independent of the BASIC program) uses to read the
+  keyboard matrix rows. With the joystick in port 1, this can
+  theoretically (see the joystick-port lesson above) produce a phantom
+  keypress — a phantom cursor-up+RETURN was observed exactly during
+  the `INPUT PI$` PIN prompt after a restart. The C64 screen editor
+  treats the current screen line as input for the `INPUT` command: if
+  the cursor lands on the already-printed prompt line ("enter your pin
+  or press enter:") via a phantom keypress and a phantom RETURN fires
+  there, the prompt line itself gets read in as the PIN and sent to
+  `/join` (server log then shows exactly the prompt text as the PIN;
+  symptom for the player: the photo fetch fails with a 404). **Actual
+  steering is NOT affected** — the main loop reads the joystick via
+  direct `PEEK`, never via the keyboard/screen input path (which this
+  bug affects). **Fix (two layers):** (1) check `pi$` after `INPUT`
+  for length (>10 chars) and whitespace, reset to `""` (→ `"NONE"`) if
+  suspicious — in both `tron_c64_client.bas` AND
+  `tron_c64_wic64_client.bas`. (2) Root cause fixed: both clients have
+  read the joystick from **port 2** instead of port 1 since 2026-09-14
+  (see the joystick-port lesson above) — avoids the line conflict
+  entirely instead of just catching its symptom. The PIN length/
+  whitespace check still stays in the code as a second, cheap layer of
+  defense.
+- **HTTP session race condition:** a `/tick` that arrives exactly at
+  game end must still have time to pick up `END`+`STATS` before the
+  session gets cleaned up server-side. Solution: a 15-second grace
+  period after `close()`, before the session actually gets deleted
   (`HTTPPlayerConn._expire`).
-- **`GET#` char-für-char:** Erst das Byte verwenden, DANN `ST` prüfen
-  (nicht umgekehrt) — sonst geht das letzte Byte vor Verbindungsende
-  verloren.
-- **Hauptschleife prüfte `START`/`ERR`/`END` nur in Kleinschreibung —
-  Client blieb bei laufendem Spiel "stumm" (2026-09-20, vom Nutzer auf
-  echter Hardware bemerkt: keinerlei Anzeige beim Spielstart):**
-  Derselbe Bug wie beim WiC64-Client (siehe dort, "WiC64-Hauptschleife
-  pruefte START/END/ERR nur in Grossschreibung") — hier aber beim
-  eigentlich als stabil geltenden Meatloaf-Client. Der `/join`-Antwort-
-  Check (Zeile 160) akzeptierte von Anfang an `SESSION`/`session`
-  beidseitig, die Hauptschleifen-Checks auf `start`/`err`/`end` (Zeilen
-  320/493/495/510) aber nur Kleinschreibung — falls der Server (oder
-  irgendein Zwischenschritt) doch einmal Großschreibung durchlässt,
-  bleibt der Bildschirm bei "waiting for opponent..." stehen, obwohl
-  das Spiel laengst laeuft. **Fix:** alle vier Stellen akzeptieren jetzt
-  beide Schreibweisen, analog zum WiC64-Fix. **Lektion:** Beim
-  Uebertragen eines Fixes von einem Client auf einen strukturell
-  aehnlichen (hier: WiC64 → Meatloaf, beide C64/HTTP-Polling) immer
-  ALLE betroffenen Stellen mitziehen, nicht nur die zuerst gefundene.
+- **`GET#` byte by byte:** use the byte first, THEN check `ST` (not
+  the other way around) — otherwise the last byte before the
+  connection ends gets lost.
+- **Main loop only checked `START`/`ERR`/`END` in lowercase — client
+  stayed "silent" during a running game (2026-09-20, noticed by the
+  user on real hardware: no indication at all when the game started):**
+  the same bug as on the WiC64 client (see there, "WiC64 main loop only
+  checked START/END/ERR in uppercase") — but here on the Meatloaf
+  client, which was actually considered stable. The `/join` response
+  check (line 160) accepted both `SESSION`/`session` from the start,
+  but the main-loop checks for `start`/`err`/`end` (lines
+  320/493/495/510) only checked lowercase — if the server (or some
+  intermediate step) ever does let uppercase through, the screen stays
+  stuck on "waiting for opponent..." even though the game has long
+  since started. **Fix:** all four spots now accept both cases,
+  mirroring the WiC64 fix. **Lesson:** when porting a fix from one
+  client to a structurally similar one (here: WiC64 → Meatloaf, both
+  C64/HTTP-polling), always carry it to ALL affected spots, not just
+  the first one found.
 
-### Schneider/Amstrad CPC + M4-Board
+### Schneider/Amstrad CPC + M4 board
 
-- **`PI` ist ein reserviertes Schlüsselwort** (Kreiszahl π) in Locomotive
-  BASIC. `PI$` als Variablenname erzeugt einen `Syntax error`, der beim
-  Zurücklisten ein verräterisches Leerzeichen vor dem `$` zeigt
-  (`INPUT PI $` statt `INPUT PI$`). Generelles Muster, falls das nochmal
-  auftaucht: kurze, unscheinbare Variablennamen können mit reservierten
-  Wörtern kollidieren (`TIME`, `MAX`, `MIN`, `FIX`, `TAG`, `MASK`, `TEST`
-  sind weitere Kandidaten in Locomotive BASIC).
-- **`|HTTPMEM` lädt in einen Speicherpuffer**, nicht in eine String-
-  Variable — praktisch, da CPC-Strings (wie C64) auf 255 Zeichen begrenzt
-  sind. Puffer vor jedem Abruf mit Nullen vorfüllen, danach bis zum ersten
-  Nullbyte scannen.
-- **"Line too long"-Fehler beim Laden** hatte NICHTS mit der tatsächlichen
-  Zeilenlänge zu tun (alle Zeilen waren weit unter dem ~255-Zeichen-Limit).
-  Ursache war ein fehlender/falscher AMSDOS-Header beim Hochladen über
-  das M4-Webinterface. Lösung war letztlich **WinAPE mit "Auto Type"**
-  (tippt eine Textdatei zeichenweise ein, genau wie beim Atari-Emulator-
-  Paste) — das umgeht das Headerproblem komplett.
+- **`PI` is a reserved keyword** (circle constant π) in Locomotive
+  BASIC. `PI$` as a variable name produces a `Syntax error` that, when
+  listed back, shows a telltale space before the `$`
+  (`INPUT PI $` instead of `INPUT PI$`). General pattern in case this
+  comes up again: short, unassuming variable names can collide with
+  reserved words (`TIME`, `MAX`, `MIN`, `FIX`, `TAG`, `MASK`, `TEST`
+  are further candidates in Locomotive BASIC).
+- **`|HTTPMEM` loads into a memory buffer**, not a string variable —
+  handy, since CPC strings (like C64) are limited to 255 characters.
+  Pre-fill the buffer with zeros before every fetch, then scan up to
+  the first null byte.
+- **The "Line too long" error on load** had NOTHING to do with actual
+  line length (every line was well under the ~255-character limit).
+  The cause was a missing/wrong AMSDOS header when uploading via the
+  M4 web interface. The eventual solution was **WinAPE's "Auto Type"**
+  (types a text file in character by character, exactly like the
+  Atari emulator paste) — this sidesteps the header problem entirely.
 
 ### Atari XL/XE + FujiNet
 
-- **`N:TCP://`** (fürs eigentliche Spiel) und **`N:HTTP://`** (für den
-  ASCII-Kunst-Abruf) verhalten sich **unterschiedlich**, obwohl beide über
-  dasselbe `N:`-Device laufen:
-  - TCP: `AUX2=2` (CR/LF-Übersetzung) ist korrekt — bestätigt über
-    hunderte Testspiele.
-  - HTTP: `AUX2` hat dort eine andere Bedeutung — `AUX2=0`, nicht `2`.
-  - Beim HTTP-Modus **kein XIO 77 nötig** — das war eine falsche Annahme
-    von mir (Claude) aus einer zu wörtlichen Doku-Interpretation, die zu
-    Fehler 146 ("Funktion nicht unterstützt") führte.
-  - `ST` nach einem `GET#` im HTTP-Modus ist **nicht zuverlässig** als
-    "fertig"-Signal nutzbar (führte zu endlosem Nullbyte-Ausgeben,
-    ATASCII `CHR$(0)` = Herzchen-Symbol). Ein Nullbyte selbst als Ende-
-    Signal zu werten hat zuverlässig funktioniert.
-  - **Firmware-Version ist entscheidend:** Mit FujiNet-Firmware 1.4
-    (Oktober 2024) funktionierte der HTTP-Modus praktisch gar nicht
-    (immer nur 1 Byte, dann Stille). Mit 1.51 lief es. Offizielle Doku-
-    Beispiele stimmen nur mit halbwegs aktueller Firmware überein.
-- **Zwei verschiedene Kanäle (`#1` fürs Spiel, `#2` fürs Bild) gleichzeitig
-  "bekannt" zu haben** hat zu Fehler 144 geführt beim Wechsel vom Bild zum
-  Spiel. Lösung: **strikt denselben Kanal** für beides nacheinander nutzen
-  (öffnen, benutzen, schließen, dann neu öffnen).
-- **`GOTO` zum Neustarten reicht nicht** — nach einem abgeschlossenen
-  Spiel funktionierte der *zweite* ASCII-Kunst-Abruf nicht mehr
-  zuverlässig, obwohl der *erste* tadellos lief. Der Sprung von `GOTO
-  <neustart-zeile>` (bleibt im selben Programmlauf) auf ein echtes `RUN`
-  (kompletter Neustart, alle Variablen weg, offenbar auch ein
-  gründlicherer Reset auf OS-/FujiNet-Ebene) hat das behoben. Falls
-  ähnliche "funktioniert beim ersten Mal, nicht beim zweiten Mal"-Symptome
-  wieder auftauchen: **`RUN` statt `GOTO`** als Test in Erwägung ziehen.
-- Bei Atari BASIC gibt es **keine Zeilen-Länge über ~120 Zeichen** — lange
-  zusammengesetzte Anweisungen (mit `:` verkettet) ggf. auf mehrere
-  Zeilen aufteilen. Symptom: "ERROR bei der Übertragung" beim Einspielen.
+- **`N:TCP://`** (for the actual game) and **`N:HTTP://`** (for the
+  ASCII-art fetch) behave **differently**, even though both go through
+  the same `N:` device:
+  - TCP: `AUX2=2` (CR/LF translation) is correct — confirmed over
+    hundreds of test games.
+  - HTTP: `AUX2` means something different there — `AUX2=0`, not `2`.
+  - In HTTP mode, **no XIO 77 needed** — that was a wrong assumption on
+    my (Claude's) part from too literal a reading of the docs, which
+    caused error 146 ("function not supported").
+  - `ST` after a `GET#` in HTTP mode is **not reliable** as a
+    "finished" signal (led to endlessly printing null bytes, ATASCII
+    `CHR$(0)` = heart symbol). Treating a null byte itself as the
+    end-of-data signal worked reliably.
+  - **Firmware version is critical:** with FujiNet firmware 1.4
+    (October 2024), HTTP mode barely worked at all (always just 1
+    byte, then silence). With 1.51 it worked. Official doc examples
+    only match reasonably current firmware.
+- **Having two different channels (`#1` for the game, `#2` for the
+  image) "known" at the same time** caused error 144 when switching
+  from the image to the game. Fix: use **strictly the same channel**
+  for both, one after another (open, use, close, then reopen).
+- **`GOTO` to restart isn't enough** — after a completed game, the
+  *second* ASCII-art fetch stopped working reliably, even though the
+  *first* worked flawlessly. Switching from `GOTO <restart-line>`
+  (stays within the same program run) to an actual `RUN` (complete
+  restart, all variables gone, apparently also a more thorough reset
+  at the OS/FujiNet level) fixed it. If similar "works the first time,
+  not the second" symptoms show up again: consider **`RUN` instead of
+  `GOTO`** as a test.
+- Atari BASIC has **no line length over ~120 characters** — split long
+  compound statements (chained with `:`) across multiple lines if
+  needed. Symptom: "ERROR during transfer" when uploading.
 
-### Commodore 64 + WiC64 (neuester, experimenteller Client)
+### Commodore 64 + WiC64 (newest, experimental client)
 
-- WiC64 hängt am **User-Port** (nicht am seriellen/IEC-Bus wie Meatloaf) —
-  komplett andere Hardware, eigenes Protokoll.
-- Statt eigenen Assembler-Code zu schreiben: Ein vom Nutzer bereitgestelltes
-  Beispielprogramm (`FOTOFIX.C000`, aus einem D64-Image extrahiert) enthält
-  bereits eine **wiederverwendbare** `SYS 49152,U$,Zieladresse`-Routine,
-  die die WiC64-Low-Level-Details kapselt. Statt das nachzubauen: **einfach
-  mit wiederladen und mit unseren eigenen URLs aufrufen** (`archive/`
-  enthält den ursprünglichen, verworfenen Ansatz "eigenen Treiber von
-  Grund auf schreiben" — nicht weiterverfolgen, der oben genannte Ansatz
-  ist vielversprechender). **Autor von `FOTOFIX.C000`: Andreas Beermann**
-  ("andi6510", siehe Disk-Label der Original-`fotofix.d64`) — die Datei
-  liegt jetzt unter `clients/c64/wic64-driver/` im Repo, siehe die
-  README dort für Details/Credit.
-- **Ursache des "`/join` scheinbar ok, `/tick` konsequent 'ERR UNKNOWN
-  SESSION'"-Bugs gefunden (2026-09-11, noch nicht auf echter Hardware
-  verifiziert):** Das im Repo mitgelieferte, definitiv funktionierende
-  Referenzbeispiel `fotofix.prg` (auf derselben Diskette) ruft `SYS 49152`
-  ausschließlich mit **kleingeschriebenen** URLs auf
-  (`"http://fotofix.classic-computing.de/"+id$+...`). Unser WiC64-Client
-  baute die Join-/Tick-URLs dagegen mit **Großschreibung**
-  (`"HTTP://"+ho$+":"+po$+"/JOIN/..."` bzw. `"/TICK/..."`). Zusätzlich
-  prüfte die Session-ID-Extraktion nicht, ob die Antwort überhaupt mit
-  `SESSION` beginnt — bei einer Fehlerantwort (z.B. vom Server als
-  `"ERR UNKNOWN REQUEST"` zurückgegeben, falls die Pfad-Großschreibung den
-  Server verwirrt) wurde einfach der Text nach dem ersten Leerzeichen als
-  vermeintliche Session-ID übernommen. Das erklärt den Eindruck "`/join`
-  hat funktioniert" (`r$` war nicht leer, sah nach einer ID aus), obwohl
-  in Wahrheit keine gültige Session existierte — jedes `/tick` scheiterte
-  danach zwangsläufig.
-  **Fix in `tron_c64_wic64_client.bas`:** alle URLs (Join, Tick,
-  ASCII-Kunst-Abruf) auf Kleinschreibung umgestellt (matching
-  `fotofix.prg`); Join-Antwort wird jetzt auf `SESSION`/`session`-Prefix
-  geprüft, bevor die Session-ID weiterverwendet wird (sonst kurze Pause +
-  Retry); Debug-Ausgabe bei `/tick`-Fehlern ergänzt (zeigt `r$` und `sn$`
-  auf dem Bildschirm), analog zum bereits vorhandenen Join-Debug-Print.
-  **Nächster Schritt:** auf echter Hardware testen — falls das
-  `/tick`-Problem weiterhin auftritt, zeigt die neue Debug-Ausgabe jetzt
-  wenigstens die rohe Serverantwort statt im Dunkeln zu tappen.
-- Ladetrick: Nach `LOAD"fotofix.c000",8,1` stoppt das BASIC-Programm
-  (Standardverhalten bei `LOAD` aus einem laufenden Programm heraus, auch
-  wenn der Load fehlschlägt — ein `FILE NOT FOUND` ist ein normaler
-  BASIC-Laufzeitfehler und stoppt genauso). Der klassische Trick, das zu
-  umgehen: `POKE631,82:POKE632,85:POKE633,78:POKE634,13:POKE198,4`
-  (schreibt "RUN"+Return in den Tastaturpuffer) direkt vor dem `LOAD`.
-  Erkennung "ist der Treiber schon geladen" per `PEEK(49152)=32` (erstes
-  Byte der Routine, eine normale BASIC-Variable würde ein `RUN` nicht
-  überleben).
-- **`petcat` tokenisiert Grossbuchstaben in String-Literalen als
-  "shifted" PETSCII (128+), nicht als das erwartete unshiftete PETSCII —
-  das bricht `LOAD`/`SAVE`-Dateinamen (2026-09-14, auf echter Hardware
-  gefunden, per Byte-Vergleich gegen das echte Disk-Verzeichnis
-  bestätigt):** Die alte Annahme "Textinhalte in Anführungszeichen bleiben
-  unberührt, egal welche Schreibweise" (siehe darunter) ist **so nicht
-  richtig** — sie stimmt nur für Text, der NACH einem Wechsel in den
-  Kleinbuchstaben-Zeichensatz (`CHR$(14)`) angezeigt wird (dort rendern
-  die "shifted"-Codes 193-218 tatsächlich als lesbare Grossbuchstaben).
-  Für alles, was auf EXAKTE Byte-Werte ankommt — allen voran ein
-  `LOAD`/`SAVE`-Dateiname, der 1:1 gegen den Diskettenverzeichnis-Eintrag
-  verglichen wird — ist sie falsch: `tron_c64_wic64_client.bas` schrieb
-  `LOAD"FOTOFIX.C000",8,1` (Grossbuchstaben im Quelltext), petcat
-  tokenisierte das zu den Byte-Werten 198,207,212,207,198,201,216,...
-  (= Buchstabe+128), waehrend das echte Disk-Verzeichnis (verifiziert per
-  `c1541 -dir` und direktem Parsen der D64-Verzeichnis-Sektoren) den
-  Dateinamen mit den PLAIN/unshifteten Werten 70,79,84,79,70,73,88,...
-  speichert. Ergebnis: `LOAD` findet die Datei NIE — dieselben
-  Bytewerte rendern zudem im Default-Zeichensatz (der beim `LOAD`, VOR
-  dem `CHR$(14)`-Wechsel, noch aktiv ist) als Grafiksymbole statt Text,
-  daher der Eindruck "Garbage in Zeile 30" beim `LIST`en. **Symptom beim
-  Testen:** Auto-Load des Treibers schlägt fehl, Betroffene mussten den
-  `LOAD`-Befehl manuell am READY-Prompt eintippen, bevor sie das
-  Hauptprogramm starten konnten — und weil der Treiber dann NIE regulär
-  automatisch lädt, bleiben nachfolgende `SYS49152`-Aufrufe im
-  Kaltstart-Fall wirkungslos (Client "verbindet", tut danach aber nichts
-  sichtbares mehr). **Fix:** Dateinamen fuer `LOAD`/`SAVE` IMMER in
-  Kleinschreibung in den Quelltext schreiben (`"fotofix.c000"` statt
-  `"FOTOFIX.C000"`) — das ergibt die unshifteten Byte-Werte, die zum
-  Diskettenverzeichnis passen. Per petcat-Testlauf bestaetigt: die
-  tokenisierten Bytes von `"fotofix.c000"` matchen exakt die echten
-  Verzeichnis-Bytes aus `fotofix.d64`.
-- **`petcat` will Befehle/Variablennamen in Kleinschreibung** — sonst
-  Tokenisierungsfehler. Reiner Anzeige-Text in Anführungszeichen (der NACH
-  dem `CHR$(14)`-Zeichensatzwechsel ausgegeben wird) darf in der
-  gewünschten Anzeige-Schreibweise bleiben — **Ausnahme:
-  Dateinamen für `LOAD`/`SAVE` müssen trotzdem klein geschrieben werden**,
-  siehe Lektion direkt darüber.
-- **WiC64-Hauptschleife prüfte `START`/`END`/`ERR` nur in Grossschreibung
-  — Client blieb bei laufendem Spiel "stumm" (2026-09-14, auf echter
-  Hardware gefunden):** Die Join-Antwort-Prüfung akzeptierte von Anfang an
-  sowohl `SESSION` als auch `session` (siehe Fix-Eintrag oben), die
-  Haupschleife (`tron_c64_wic64_client.bas`, Prüfungen auf `START`/`END`/
-  `ERR`) aber nur die Grossschreibung. Da genau derselbe Treiber/dieselbe
-  Verbindung nachweislich auch abgehende Texte in Kleinschreibung
-  verwandelt (siehe Fix oben — Server-Log zeigt ankommende Requests
-  durchgehend klein geschrieben, obwohl der Client-Code Grossschreibung
-  verwendet), ist es sehr wahrscheinlich, dass auch ankommende
-  Serverantworten kleingeschrieben ankommen — die reinen
-  Grossschreibungs-Vergleiche haetten dann NIE gegriffen. Symptom auf
-  Hardware: Client verbindet, zeigt "waiting for opponent...", aber selbst
-  nachdem ein zweiter Spieler beigetreten ist und die Partie serverseitig
-  läuft/endet, bleibt der Bildschirm unveraendert (kein "use joystick",
-  kein "game over") — Server-Log zeigt derweil endloses `/tick`-Polling
-  mit Richtung `n` weit über das Spielende hinaus. **Fix:** `START`/`END`/
-  `ERR`-Pruefungen in der Hauptschleife akzeptieren jetzt beide
-  Schreibweisen, analog zum bereits vorhandenen `SESSION`/`session`-Muster
-  bei der Join-Antwort.
-- **"`/join` ok, `/tick` = 'ERR UNKNOWN SESSION'"-Bug:** siehe Fix-Eintrag
-  weiter oben (Großschreibung der URLs + fehlende Prefix-Prüfung der
-  Join-Antwort) — auf Hardware noch zu verifizieren.
-- **Weiterhin offen:** Ob `SYS 49152` für sehr häufiges, wiederholtes
-  Abfragen (unser `/tick`-Polling, viele Aufrufe pro Sekunde) genauso
-  zuverlässig ist wie für die vom Original-Programm vorgesehenen seltenen
-  Einzelabrufe — falls der obige Fix das Problem nicht vollständig löst,
-  hier als Nächstes ansetzen (z.B. Pacing/Delay zwischen `/tick`-Aufrufen
-  testen).
-  - **Erste Messung (2026-09-19):** Beantwortet die obige Frage zumindest
-    teilweise — mit dem neuen `[tick-latency]`-Logging (siehe
-    `HTTPPlayerConn.last_tick_at` in `server/tron_server.py`) lag die
-    Zeit zwischen aufeinanderfolgenden `/tick`-Aufrufen des WiC64-Clients
-    (VICE-Emulator, kein Bot als Gegner sondern ein echter TCP-Bot auf
-    Atari-Seite) durchgehend bei **1272–1290 ms** — bei `TICK_RATE=8`
-    (125 ms/Tick) also rund **10 Server-Ticks pro WiC64-Eingabe**. Die
-    enge Spanne (nur ~18 ms Streuung) spricht eher für einen festen,
-    deterministischen Overhead im WiC64-Protokoll/Treiber (User-Port-
-    Handshake mit dem ESP-Modul) als für reines Netzwerk-Jitter.
-    **Testumgebung:** Ubuntu Linux, Intel i5, 16 GB RAM, VICE aus dem
-    Git-Quellcode selbst kompiliert (nicht auf echter WiC64-Hardware
-    verifiziert — der Emulator könnte hier anders/langsamer als echte
-    Hardware timen). **Einordnung:** `TICK_RATE` deswegen NICHT global
-    absenken — das würde das Spiel für alle Plattformen verlangsamen,
-    allen voran Atari mit praktisch keiner Eingabe-Latenz, ohne WiC64
-    dadurch wirklich konkurrenzfähig zu machen. WiC64 bleibt der
-    experimentelle Bonus-Client, Meatloaf bleibt der verlässliche
-    Standard-C64-Client für CC2026.
-  - **Vergleichsmessung Meatloaf (2026-09-19, echtes Spiel gegen
-    `bots/tron_bot.sh`):** Im Steady State **294–306 ms** pro `/tick`
-    — rund **4x schneller als WiC64** (~1280 ms), aber immer noch gut
-    **2,4x langsamer als `TICK_RATE=8`** (125 ms/Tick) — auch der
-    "verlässliche" HTTP-Polling-Client bekommt also nur etwa alle 2-3
-    Server-Ticks eine neue Eingabe durch, nicht jeden. Ein Ausreißer von
-    1444 ms beobachtet — inzwischen (siehe "Reproduzierbarer
-    Latenz-Ausreißer" weiter unten) als wiederkehrendes, gut erklärbares
-    Muster erkannt, kein Zufall. Bestätigt:
-    HTTP-Polling hat generell einen spürbaren Latenz-Sockel gegenüber
-    Atars rohem TCP, aber der ist bei Meatloaf offenbar akzeptabel
-    (Client gilt seit vielen echten Spielen als stabil) - WiC64s
-    ~1280 ms sind nochmal eine andere Größenordnung.
-  - **Vergleichsmessung CPC/M4 (2026-09-19, ECHTE HARDWARE - nicht
-    Emulator):** Im Steady State **542–559 ms** pro `/tick` (Solo-Test)
-    bzw. **543–551 ms** (im anschließenden echten Spiel gegen den
-    Meatloaf-Client, s.u.) — liegt damit zwischen Meatloaf (~300 ms)
-    und WiC64 (~1280 ms), rund **1,8x langsamer als Meatloaf**, aber
-    **2,3x schneller als WiC64**. Bei `TICK_RATE=8` (125 ms/Tick) macht
-    das rund **4,4 Server-Ticks pro CPC-Eingabe**. Erklärt sich
-    plausibel durch die bereits in `CLAUDE.md` dokumentierte
-    `|HTTPMEM`-Eigenschaft, während des Abrufs jede andere Verarbeitung
-    zu blockieren. Auch hier ein Ausreißer (1095 ms statt ~550 ms) im
-    späteren Spiel beobachtet, gleiches Bild wie beim Meatloaf-Ausreißer
-    oben — ebenfalls Teil des unten dokumentierten reproduzierbaren
-    Musters.
-  - **Rangfolge nach dieser ersten Messrunde (schnellste zuerst):**
-    Atari (rohes TCP, praktisch verzögerungsfrei) < Meatloaf (~300 ms,
-    ~2,4 Ticks) < CPC/M4 (~550 ms, ~4,4 Ticks) < WiC64 (~1280 ms,
-    ~10 Ticks). Alle drei HTTP-Polling-Werte liegen deutlich über
-    `TICK_RATE`s 125 ms, das Spiel funktioniert trotzdem seit vielen
-    Spielen zuverlässig - spricht weiterhin dagegen, `TICK_RATE` als
-    Reaktion darauf zu verändern (siehe Einordnung oben).
-  - **Erster echter Hardware-Crossplay-Smoketest (2026-09-19) —
-    KORREKTUR, kein echter Spieltest:** CPC/M4 vs. C64/Meatloaf, beide
-    auf echter Hardware, endete mit "draw (simultaneous crash)" nach
-    ~7 Sekunden. **Wichtige Einschränkung (nachträglich vom Nutzer
-    klargestellt):** Beide Clients liefen dabei OHNE angeschlossenen
-    Joystick (Joysticks + Upscaler zum Testzeitpunkt noch nicht da,
-    beides "on the way") — beide Spieler haben sich also nie bewegt
-    (`STICK`/`PEEK` liest konstant "keine Eingabe", Server bekommt
-    durchgehend Richtung "N"), das "draw" kam vermutlich einfach vom
-    gleichzeitigen Ablauf der Countdown-/Spiel-Logik, nicht von echtem
-    Steuern. **Was das trotzdem zeigt:** Pairing, `/join`+`/tick`-
-    Protokoll, Latenz-Messung und Spielende-Ablauf funktionieren
-    Ende-zu-Ende auf echter Hardware für beide Plattformen gleichzeitig
-    - das war schon nützlich. **Was es NICHT zeigt:** ob Steuern per
-    Joystick auf beiden Plattformen tatsächlich funktioniert und wie
-    sich ein *echtes* Duell (inkl. Kollisionsvermeidung/-erkennung bei
-    aktiver Steuerung) anfühlt. Diese Paarung aus der Testcheckliste
-    (`docs/hardware_test_checklist.pdf`, Abschnitt 5) gilt deshalb
-    weiterhin als offen, sobald Joysticks + Upscaler da sind.
-    **Update (2026-09-20): Joysticks sind da, jetzt echt verifiziert**
-    — siehe die beiden folgenden Einträge.
-  - **Reproduzierbarer Latenz-Ausreißer, immer der 2. `/tick` nach
-    `GAME START` (2026-09-20):** Über vier echte Matches (CPC vs. Atari,
-    CPC vs. Meatloaf x3) hinweg zeigt sich derselbe Ausreißer aus den
-    Messungen oben nicht als Zufall, sondern als reproduzierbares
-    Muster: **immer genau die zweite geloggte `/tick`-Latenz nach dem
-    `GAME START`-Header** liegt deutlich über dem sonstigen Steady
-    State (z.B. CPC 917/883/895 ms statt ~550 ms; C64 1490 ms statt
-    ~350 ms in einem der Matches) — betrifft dabei nicht immer dieselbe
-    Plattform, sondern offenbar wer auch immer gerade während des
-    fraglichen Zeitfensters kurz nach Spielstart pollt. Eine naheliegende
-    Ursache wurde geprüft und ausgeschlossen: Der Besucherfoto-Abruf
-    (`resolve_photo`/`fetch_photo_blocking`) läuft bereits korrekt über
-    `run_in_executor` in einem separaten Thread, blockiert die
-    Event-Loop also nicht. Tatsächliche Ursache noch offen (Verdacht:
-    irgendetwas im Countdown-Uebergang in `run_game()` - 3-2-1-Countdown
-    + "Go, get in there!"-Pause), aber unkritisch: tritt genau einmal
-    pro Match auf, immer bevor der Spieler wirklich steuert (waehrend
-    Countdown/kurz danach), alle Ticks *waehrend* des eigentlichen
-    Duells bleiben stabil im Steady State. Nicht vor CC2026 verfolgen,
-    es sei denn es taucht ploetzlich auch mitten im Spiel auf.
-  - **Erster ECHTER Hardware-Crossplay-Test mit Steuerung (2026-09-20):**
-    Mit angeschlossenen Joysticks liefen mehrere echte Matches CPC/M4
-    vs. Atari sowie CPC/M4 vs. C64/Meatloaf (jeweils mehrfach) - beide
-    Seiten haben sichtbar gesteuert (`[move]`-Logeinträge auf beiden
-    Plattformen), Ergebnisse wechselten zwischen beiden Seiten (kein
-    einseitiger Vorteil erkennbar). Bestätigt gleichzeitig auf echter
-    Hardware: der Meatloaf-Fix von 2026-09-20 (`START`/`ERR`/`END` in
-    Groß-/Kleinschreibung) haelt - "USE JOYSTICK" erscheint jetzt
-    zuverlaessig beim Spielstart. Damit sind aus der Testcheckliste
-    (Abschnitt 5) die Paarungen **Atari vs. CPC** und **C64 (Meatloaf)
-    vs. CPC** jetzt mit echter Steuerung verifiziert.
+- WiC64 hangs off the **User Port** (not the serial/IEC bus like
+  Meatloaf) — completely different hardware, its own protocol.
+- Instead of writing custom assembly: a sample program the user
+  provided (`FOTOFIX.C000`, extracted from a D64 image) already
+  contains a **reusable** `SYS 49152,U$,target-address` routine that
+  encapsulates the WiC64 low-level details. Instead of rebuilding
+  that: **just load it and call it with our own URLs** (`archive/`
+  contains the original, abandoned approach of "write our own driver
+  from scratch" — don't pursue that, the approach above is more
+  promising). **Author of `FOTOFIX.C000`: Andreas Beermann**
+  ("andi6510", see the disk label of the original `fotofix.d64`) — the
+  file now lives under `clients/c64/wic64-driver/` in the repo, see
+  the README there for details/credit.
+- **Cause found for the "`/join` looks ok, `/tick` consistently 'ERR
+  UNKNOWN SESSION'" bug (2026-09-11, not yet verified on real
+  hardware):** the definitely-working reference example `fotofix.prg`
+  shipped in the repo (on the same disk) calls `SYS 49152` exclusively
+  with **lowercase** URLs
+  (`"http://fotofix.classic-computing.de/"+id$+...`). Our WiC64 client,
+  by contrast, built the join/tick URLs with **uppercase**
+  (`"HTTP://"+ho$+":"+po$+"/JOIN/..."` and `"/TICK/..."`). On top of
+  that, the session-ID extraction didn't check whether the response
+  actually started with `SESSION` — on an error response (e.g. the
+  server returning `"ERR UNKNOWN REQUEST"` if the path's uppercase
+  confused it), the text after the first space was simply taken as the
+  supposed session ID. That explains the impression that "`/join`
+  worked" (`r$` wasn't empty, looked like an ID), even though in truth
+  no valid session existed — every subsequent `/tick` was then bound
+  to fail. **Fix in `tron_c64_wic64_client.bas`:** all URLs (join,
+  tick, ASCII-art fetch) switched to lowercase (matching
+  `fotofix.prg`); the join response is now checked for a
+  `SESSION`/`session` prefix before the session ID gets used further
+  (short pause + retry otherwise); added debug output on `/tick`
+  errors (shows `r$` and `sn$` on screen), mirroring the join debug
+  print that already existed. **Next step:** test on real hardware —
+  if the `/tick` problem persists, the new debug output at least shows
+  the raw server response now instead of guessing in the dark.
+- Load trick: after `LOAD"fotofix.c000",8,1`, the BASIC program stops
+  (standard behavior for `LOAD` from within a running program, even if
+  the load fails — a `FILE NOT FOUND` is a normal BASIC runtime error
+  and stops it just the same). The classic trick to work around this:
+  `POKE631,82:POKE632,85:POKE633,78:POKE634,13:POKE198,4` (writes
+  "RUN"+Return into the keyboard buffer) right before the `LOAD`.
+  Detecting "is the driver already loaded" via `PEEK(49152)=32` (first
+  byte of the routine — a normal BASIC variable wouldn't survive a
+  `RUN`).
+- **`petcat` tokenizes uppercase letters in string literals as
+  "shifted" PETSCII (128+), not the expected unshifted PETSCII — this
+  breaks `LOAD`/`SAVE` filenames (2026-09-14, found on real hardware,
+  confirmed by byte comparison against the actual disk directory):**
+  the old assumption "text content in quotes stays untouched, whatever
+  the case" (see below) turns out to be **not quite right** — it only
+  holds for text displayed AFTER switching to the lowercase character
+  set (`CHR$(14)`) (there, the "shifted" codes 193-218 actually render
+  as readable uppercase letters). For anything relying on EXACT byte
+  values — first and foremost a `LOAD`/`SAVE` filename compared
+  1:1 against the disk directory entry — it's wrong:
+  `tron_c64_wic64_client.bas` wrote `LOAD"FOTOFIX.C000",8,1`
+  (uppercase in the source), and petcat tokenized that to byte values
+  198,207,212,207,198,201,216,... (= letter+128), while the actual
+  disk directory (verified via `c1541 -dir` and directly parsing the
+  D64 directory sectors) stores the filename with the PLAIN/unshifted
+  values 70,79,84,79,70,73,88,... Result: `LOAD` NEVER finds the file
+  — the same byte values also render as graphics symbols instead of
+  text in the default character set (still active at `LOAD` time,
+  BEFORE the `CHR$(14)` switch), hence the impression of "garbage on
+  line 30" when `LIST`ing. **Symptom during testing:** the driver's
+  auto-load fails, affected users had to type the `LOAD` command
+  manually at the READY prompt before they could start the main
+  program — and since the driver then NEVER loads automatically on a
+  regular basis, subsequent `SYS49152` calls stay ineffective on a
+  cold start (client "connects" but then visibly does nothing
+  further). **Fix:** ALWAYS write `LOAD`/`SAVE` filenames in lowercase
+  in the source (`"fotofix.c000"` instead of `"FOTOFIX.C000"`) — that
+  produces the unshifted byte values matching the disk directory.
+  Confirmed via a petcat test run: the tokenized bytes of
+  `"fotofix.c000"` exactly match the real directory bytes from
+  `fotofix.d64`.
+- **`petcat` wants commands/variable names in lowercase** — otherwise
+  tokenization errors. Plain display text in quotes (printed AFTER the
+  `CHR$(14)` character-set switch) may stay in whatever case you want
+  it displayed in — **exception: filenames for `LOAD`/`SAVE` still
+  have to be lowercase**, see the lesson directly above.
+- **WiC64 main loop only checked `START`/`END`/`ERR` in uppercase —
+  client stayed "silent" during a running game (2026-09-14, found on
+  real hardware):** the join-response check accepted both `SESSION`
+  and `session` from the start (see the fix entry above), but the main
+  loop (`tron_c64_wic64_client.bas`, checks for `START`/`END`/`ERR`)
+  only checked uppercase. Since the exact same driver/connection has
+  demonstrably also been converting outgoing text to lowercase (see
+  the fix above — server log shows incoming requests consistently
+  lowercase, even though the client code uses uppercase), it's very
+  likely that incoming server responses also arrive lowercase — the
+  pure uppercase comparisons would then NEVER have matched. Symptom on
+  hardware: client connects, shows "waiting for opponent...", but even
+  after a second player joins and the match runs/ends server-side, the
+  screen stays unchanged (no "use joystick", no "game over") — server
+  log meanwhile shows endless `/tick` polling with direction `n` long
+  past game end. **Fix:** the `START`/`END`/`ERR` checks in the main
+  loop now accept both cases, mirroring the `SESSION`/`session`
+  pattern already in place for the join response.
+- **"`/join` ok, `/tick` = 'ERR UNKNOWN SESSION'" bug:** see the fix
+  entry further above (uppercase URLs + missing prefix check on the
+  join response) — still to be verified on hardware.
+- **Still open:** whether `SYS 49152` is just as reliable for very
+  frequent, repeated polling (our `/tick` polling, many calls per
+  second) as for the rare single calls the original program was
+  designed for — if the fix above doesn't fully solve the problem,
+  tackle this next (e.g. test pacing/delay between `/tick` calls).
+  - **First measurement (2026-09-19):** at least partially answers the
+    question above — with the new `[tick-latency]` logging (see
+    `HTTPPlayerConn.last_tick_at` in `server/tron_server.py`), the time
+    between consecutive `/tick` calls from the WiC64 client (VICE
+    emulator, opponent was a real TCP bot on the Atari side, not
+    another bot) sat consistently at **1272–1290 ms** — at
+    `TICK_RATE=8` (125 ms/tick) that's roughly **10 server ticks per
+    WiC64 input**. The tight spread (only ~18 ms variance) points more
+    towards a fixed, deterministic overhead in the WiC64
+    protocol/driver (User-Port handshake with the ESP module) than
+    plain network jitter. **Test environment:** Ubuntu Linux, Intel
+    i5, 16 GB RAM, VICE compiled from git source itself (not verified
+    on real WiC64 hardware — the emulator could time this
+    differently/more slowly than real hardware). **Takeaway:** do NOT
+    lower `TICK_RATE` globally because of this — that would slow the
+    game down for every platform, Atari most of all with practically
+    no input latency, without actually making WiC64 competitive.
+    WiC64 stays the experimental bonus client, Meatloaf stays the
+    reliable standard C64 client for CC2026.
+  - **Comparison measurement, Meatloaf (2026-09-19, real game against
+    `bots/tron_bot.sh`):** steady state of **294–306 ms** per `/tick`
+    — roughly **4x faster than WiC64** (~1280 ms), but still a good
+    **2.4x slower than `TICK_RATE=8`** (125 ms/tick) — so even the
+    "reliable" HTTP-polling client only gets a new input through
+    roughly every 2-3 server ticks, not every one. An outlier of
+    1444 ms was observed — meanwhile recognized (see "Reproducible
+    latency outlier" further below) as a recurring, well-explained
+    pattern, not chance. Confirms: HTTP polling generally has a
+    noticeable latency floor compared to Atari's raw TCP, but that's
+    apparently acceptable for Meatloaf (the client is considered
+    stable after many real games) - WiC64's ~1280 ms is a whole
+    different order of magnitude.
+  - **Comparison measurement, CPC/M4 (2026-09-19, REAL HARDWARE - not
+    an emulator):** steady state of **542–559 ms** per `/tick`
+    (solo test) resp. **543–551 ms** (in the subsequent real game
+    against the Meatloaf client, see below) — sits between Meatloaf
+    (~300 ms) and WiC64 (~1280 ms), roughly **1.8x slower than
+    Meatloaf**, but **2.3x faster than WiC64**. At `TICK_RATE=8`
+    (125 ms/tick) that's roughly **4.4 server ticks per CPC input**.
+    Plausibly explained by the `|HTTPMEM` property already documented
+    in `CLAUDE.md` of blocking all other processing during the call.
+    Here too, an outlier (1095 ms instead of ~550 ms) was observed in
+    a later game, same picture as the Meatloaf outlier above — also
+    part of the reproducible pattern documented below.
+  - **Ranking after this first round of measurements (fastest
+    first):** Atari (raw TCP, practically zero delay) < Meatloaf
+    (~300 ms, ~2.4 ticks) < CPC/M4 (~550 ms, ~4.4 ticks) < WiC64
+    (~1280 ms, ~10 ticks). All three HTTP-polling values sit well
+    above `TICK_RATE`'s 125 ms, and the game still works reliably
+    after many games regardless - still an argument against changing
+    `TICK_RATE` in response (see the takeaway above).
+  - **First real-hardware crossplay smoke test (2026-09-19) —
+    CORRECTION, not an actual gameplay test:** CPC/M4 vs. C64/Meatloaf,
+    both on real hardware, ended with "draw (simultaneous crash)"
+    after ~7 seconds. **Important caveat (clarified afterwards by the
+    user):** both clients ran with NO joystick connected (joysticks +
+    upscaler weren't there yet at test time, both "on the way") — so
+    neither player ever actually moved (`STICK`/`PEEK` constantly
+    reads "no input", server gets direction "N" throughout), the
+    "draw" presumably just came from the countdown/game logic running
+    its course on both sides simultaneously, not from real steering.
+    **What it does show, regardless:** pairing, the `/join`+`/tick`
+    protocol, latency measurement, and the end-of-game flow all work
+    end-to-end on real hardware for both platforms at once - that was
+    still useful. **What it does NOT show:** whether steering via
+    joystick actually works on both platforms, and what a *real* duel
+    (incl. collision avoidance/detection under active steering) feels
+    like. This pairing from the test checklist
+    (`docs/hardware_test_checklist.pdf`, section 5) therefore still
+    counts as open, once joysticks + the upscaler arrive.
+    **Update (2026-09-20): joysticks have arrived, now genuinely
+    verified** — see the following two entries.
+  - **Reproducible latency outlier, always the 2nd `/tick` after
+    `GAME START` (2026-09-20):** across four real matches (CPC vs.
+    Atari, CPC vs. Meatloaf x3), the same outlier from the
+    measurements above turns out not to be chance but a reproducible
+    pattern: **always exactly the second logged `/tick` latency after
+    the `GAME START` header** sits well above the usual steady state
+    (e.g. CPC 917/883/895 ms instead of ~550 ms; C64 1490 ms instead
+    of ~350 ms in one of the matches) — doesn't always affect the same
+    platform, but apparently whoever happens to be polling during the
+    window in question shortly after game start. One obvious cause was
+    checked and ruled out: the visitor-photo fetch
+    (`resolve_photo`/`fetch_photo_blocking`) already correctly runs
+    via `run_in_executor` on a separate thread, so it doesn't block
+    the event loop. Actual cause still open (suspect: something in the
+    countdown transition in `run_game()` - the 3-2-1 countdown +
+    "Go, get in there!" pause), but not critical: happens exactly once
+    per match, always before the player is actually steering (during
+    the countdown/shortly after), every tick *during* the actual duel
+    stays stable at the steady state. Don't chase this before CC2026
+    unless it suddenly also shows up mid-game.
+  - **First REAL hardware crossplay test with steering (2026-09-20):**
+    with joysticks connected, several real matches of CPC/M4 vs. Atari
+    and CPC/M4 vs. C64/Meatloaf were played (each multiple times) -
+    both sides visibly steered (`[move]` log entries on both
+    platforms), results alternated between both sides (no one-sided
+    advantage apparent). Also confirms on real hardware at the same
+    time: the 2026-09-20 Meatloaf fix (`START`/`ERR`/`END` case
+    handling) holds - "USE JOYSTICK" now shows up reliably at game
+    start. This means the pairings **Atari vs. CPC** and **C64
+    (Meatloaf) vs. CPC** from the test checklist (section 5) are now
+    verified with real steering.
 
-## UI-Vereinfachung aller Clients (2026-09-12)
+## UI simplification of all clients (2026-09-12)
 
-Nach dem Meatloaf-Hardwaretest vom 2026-09-12 (siehe Session-Mismatch-Fund
-oben) — dort zeigte sich außerdem, dass die ASCII-Kunst-Anzeige auf dem
-C64 nicht korrekt dargestellt wurde — wurden alle vier Clients
+After the 2026-09-12 Meatloaf hardware test (see the session-mismatch
+finding above) — which also showed that the ASCII-art display wasn't
+rendering correctly on the C64 — all four clients
 (`tron_atari_client.bas`, `tron_c64_client.bas`,
-`tron_c64_wic64_client.bas`, `tron_cpc_client.bas`) bewusst radikal
-vereinfacht:
+`tron_c64_wic64_client.bas`, `tron_cpc_client.bas`) were deliberately,
+radically simplified:
 
-- **Entfernt, in allen vier Clients:**
-  - Die ASCII-Kunst-Digitalisierung des Besucherfotos (Subroutine `3000`
-    je Client, inkl. des HTTP/`|HTTPMEM`/`SYS49152`-Abrufs von
+- **Removed, in all four clients:**
+  - The ASCII-art digitization of the visitor photo (subroutine `3000`
+    per client, including the HTTP/`|HTTPMEM`/`SYS49152` fetch of
     `ascii-terminal.txt`).
-  - Der zeichenweise "Terminal-Tippeffekt" beim Ausgeben von Text
-    (Subroutine `4000` je Client).
-  - Die MCP-Storyline (`"MCP:> ..."`-Texte wie "WELCOME TO THE GRID",
+  - The character-by-character "terminal typing effect" for printed
+    text (subroutine `4000` per client).
+  - The MCP storyline (`"MCP:> ..."` texts like "WELCOME TO THE GRID",
     "MASTER CONTROL PROGRAM SEARCH PHOTO", "YOU'VE GRANTED ACCESS...").
-- **Übrig bleibt eine knappe, rein funktionale Textausgabe** (direktes
-  `PRINT`, kein Zwischenschritt mehr über `tx$`+`GOSUB`): PIN-Abfrage
-  (`"ENTER YOUR PIN OR PRESS ENTER:"`), Verbindungsaufbau
-  (`"CONNECTING..."`), Warten auf Gegner (`"WAITING FOR OPPONENT..."`),
-  Joystick-Hinweis (`"USE JOYSTICK"`), Spielende + Ergebnis
-  (`"GAME OVER"` + die rohe Server-Antwortzeile), und Neustart
-  (`"RESTARTING..."`).
-- **Nicht betroffen:** Das serverseitige Foto-Feature (Besucherfoto im
-  pygame-Seitenpanel) bleibt unverändert — das ist komplett serverseitig
-  (`fetch_photo_ftp_blocking`/`fetch_photo_http`) und unabhängig von der
-  jetzt entfernten Client-seitigen ASCII-Vorschau. Die PIN wird weiterhin
-  ganz normal an `/join` bzw. `HELLO` mitgegeben.
-- **Warum:** Weniger Code pro Client bedeutet weniger Fläche für genau
-  die Art von Bugs, die dieses Projekt bisher am meisten Zeit gekostet
-  hat (siehe Lektionen oben) — und ein kaputter Digitalisierungs-Screen
-  ist auf einer Ausstellung schlechter als gar keiner.
+- **What's left is terse, purely functional text output** (direct
+  `PRINT`, no more detour through `tx$`+`GOSUB`): PIN prompt
+  (`"ENTER YOUR PIN OR PRESS ENTER:"`), connecting
+  (`"CONNECTING..."`), waiting for an opponent
+  (`"WAITING FOR OPPONENT..."`), joystick hint (`"USE JOYSTICK"`),
+  game end + result (`"GAME OVER"` + the raw server response line),
+  and restart (`"RESTARTING..."`).
+- **Not affected:** the server-side photo feature (visitor photo in
+  the pygame side panel) is unchanged — that's entirely server-side
+  (`fetch_photo_ftp_blocking`/`fetch_photo_http`) and independent of
+  the now-removed client-side ASCII preview. The PIN is still passed
+  to `/join` resp. `HELLO` completely normally.
+- **Why:** less code per client means less surface area for exactly
+  the kind of bugs that have cost this project the most time so far
+  (see the lessons above) — and a broken digitization screen is worse
+  at an exhibition than no digitization screen at all.
 
-## Allgemeine, plattformübergreifende Muster
+## General, cross-platform patterns
 
-1. **Reservierte Variablennamen sind eine wiederkehrende Fallgrube.**
-   Kurze Variablennamen (2-3 Buchstaben) IMMER gegen die jeweilige
-   BASIC-Referenz prüfen, bevor sie verwendet werden — `PI` (CPC), `TI`
-   (C64) waren beide genau diese Art Bug, mit demselben Symptom-Muster
-   (Syntax error an einer unauffälligen Stelle).
-2. **Groß-/Kleinschreibung bei Netzwerk-Text niemals voraussetzen.**
-   Sowohl Meatloaf als auch WiC64 (über die Fotofix-Routine) wandeln
-   Text beim Senden/Empfangen um. Server-seitige Vergleiche IMMER
-   case-insensitive halten (`.upper()`).
-3. **String-Längenbegrenzung auf 8-Bit-BASIC (255 Zeichen)** — nie eine
-   komplette HTTP-Antwort in eine String-Variable akkumulieren, wenn sie
-   potenziell groß werden kann (z.B. die ASCII-Kunst). Stattdessen
-   zeichenweise aus dem Speicher verarbeiten.
-4. **Bei "funktioniert einmal, dann nicht mehr"-Symptomen**: Verdacht auf
-   nicht vollständig zurückgesetzten Verbindungs-/Geräte-Zustand nach
-   Wiederverwendung eines Kanals/einer Verbindung. Bisher beste Lösungen:
-   entweder denselben Kanal strikt sequenziell nutzen, oder (Atari-Fall)
-   einen kompletten `RUN`-Neustart statt `GOTO`.
-5. **Bei jedem neuen Fehlerbild: zuerst Sichtbarkeit schaffen, dann
-   raten.** Diagnose-Ausgaben (Fehlercode, Rohantwort, Byteanzahl) haben
-   in fast jedem Fall schneller zur Lösung geführt als eine zweite oder
-   dritte Vermutung ohne neue Daten.
-6. **BASIC-Zeilennummern-Konsistenz nach jeder Änderung prüfen** (keine
-   Duplikate, aufsteigend, keine Zeile über der jeweiligen Plattform-
-   Grenze — Atari ~120 Zeichen, C64/CPC deutlich lockerer). Ein kleines
-   Python-Skript dafür lohnt sich, siehe Beispiel unten.
-7. **Konvention: Alle Clients nutzen den ersten Joystick-Port ihres
-   Rechners — mit einer bewussten, dokumentierten Ausnahme für den C64.**
-   Atari (`STICK(JSPORT)` mit `JSPORT=0`) und CPC (`JOY(0)`) nutzen von
-   Anfang an korrekt ihren jeweils ersten Port. Der C64 (Meatloaf UND
-   WiC64) wurde testweise auf Port 1 (`PEEK(56321)`/`$DC01`) umgestellt,
-   dann aber am 2026-09-14 wieder auf **Port 2** (`PEEK(56320)`/`$DC00`)
-   zurückgestellt — Port 1 teilt sich Leitungen mit der Tastaturmatrix und
-   erzeugte auf echter Hardware reale Phantom-Tastendrücke (siehe
-   Joystick-Port-Lektion und PIN-Eingabe-Lektion oben). Für den C64 hat
-   Zuverlässigkeit auf der Ausstellung Vorrang vor der reinen
-   Port-Nummern-Konsistenz zwischen den Plattformen.
+1. **Reserved variable names are a recurring trap.** ALWAYS check
+   short variable names (2-3 letters) against the respective BASIC's
+   reference before using them — `PI` (CPC), `TI` (C64) were both
+   exactly this kind of bug, with the same symptom pattern (syntax
+   error at an unremarkable spot).
+2. **Never assume case for network text.** Both Meatloaf and WiC64
+   (via the Fotofix routine) transform text when sending/receiving.
+   Always keep server-side comparisons case-insensitive (`.upper()`).
+3. **String length limit on 8-bit BASIC (255 characters)** — never
+   accumulate a complete HTTP response into a string variable if it
+   could potentially get large (e.g. the ASCII art). Process it
+   character by character from memory instead.
+4. **On "works once, then not again" symptoms**: suspect an
+   incompletely reset connection/device state after reusing a
+   channel/connection. Best solutions found so far: either use the
+   same channel strictly sequentially, or (the Atari case) do a
+   complete `RUN` restart instead of `GOTO`.
+5. **For every new failure mode: create visibility first, then
+   guess.** Diagnostic output (error code, raw response, byte count)
+   has led to a solution faster in almost every case than a second or
+   third guess without new data.
+6. **Check BASIC line-number consistency after every change** (no
+   duplicates, ascending, no line over the respective platform limit —
+   Atari ~120 characters, C64/CPC considerably more relaxed). A small
+   Python script for this is worthwhile, see the example below.
+7. **Convention: all clients use the first joystick port of their
+   computer — with one deliberate, documented exception for the C64.**
+   Atari (`STICK(JSPORT)` with `JSPORT=0`) and CPC (`JOY(0)`) have
+   correctly used their respective first port from the start. The C64
+   (Meatloaf AND WiC64) was switched to port 1 (`PEEK(56321)`/`$DC01`)
+   as a trial, then reverted to **port 2** (`PEEK(56320)`/`$DC00`) on
+   2026-09-14 — port 1 shares lines with the keyboard matrix and
+   produced real phantom keypresses on real hardware (see the
+   joystick-port lesson and the PIN-entry lesson above). For the C64,
+   reliability at the exhibition takes priority over pure port-number
+   consistency across platforms.
 
 ```python
-# Schnelle BASIC-Zeilennummern-Konsistenzpruefung
-with open("datei.bas") as f:
+# Quick BASIC line-number consistency check
+with open("file.bas") as f:
     lines = f.read().splitlines()
 nums = [int(l.split()[0]) for l in lines if l.strip() and l.split()[0].isdigit()]
-assert len(set(nums)) == len(nums), "Duplikate!"
-assert all(nums[i] < nums[i+1] for i in range(len(nums)-1)), "Nicht aufsteigend!"
+assert len(set(nums)) == len(nums), "Duplicates!"
+assert all(nums[i] < nums[i+1] for i in range(len(nums)-1)), "Not ascending!"
 ```
 
-## Clients auf die Zielsysteme übertragen
+## Transferring clients to the target systems
 
-Wie der `.bas`-Quelltext tatsächlich auf dem jeweiligen Retro-Rechner
-landet (vom Nutzer erprobter Workflow, nicht offensichtlich aus dem Code
-ersichtlich):
+How the `.bas` source code actually ends up on each retro computer
+(a workflow the user tested themselves, not obvious from the code):
 
 ### Atari (FujiNet)
 
-Auf einem PC FujiNet + Altirra installieren. Über FujiNet eine Diskette
-mit dem N-Device auf die simulierte SD-Karte kopieren und davon booten.
-Im BASIC-Interpreter lässt sich das Programm per Rechtsklick einfügen
-("Paste"), dann abspeichern. Das fertige Disk-Image anschließend auf die
-echte SD-Karte des FujiNet übertragen.
+Install FujiNet + Altirra on a PC. Copy a disk with the N: device onto
+the simulated SD card via FujiNet and boot from it. In the BASIC
+interpreter, the program can be pasted in via right-click ("Paste"),
+then saved. Transfer the finished disk image to the FujiNet's real SD
+card afterwards.
 
-#### Alternative für Automatisierung: `.atr`-Images direkt bearbeiten (noch nicht getestet)
+#### Automation alternative: editing `.atr` images directly (not yet tested)
 
-Der Weg oben (Altirra-Paste) ist für einzelne, manuelle Übertragungen
-gedacht. Für ein automatisiertes Skript/Pipeline-Setup auf Ubuntu gibt es
-mehrere Kommandozeilen-Tools, die `.atr`-Images direkt bearbeiten können
-— normale Linux-Tools wie `mtools` funktionieren hier NICHT, weil Atari-
-Dateisysteme (DOS 2.0, DOS 2.5, MyDOS, SpartaDOS) kein FAT sind:
+The approach above (Altirra paste) is meant for individual, manual
+transfers. For an automated script/pipeline setup on Ubuntu, there are
+several command-line tools that can edit `.atr` images directly —
+normal Linux tools like `mtools` do NOT work here, because Atari
+filesystems (DOS 2.0, DOS 2.5, MyDOS, SpartaDOS) aren't FAT:
 
-- **[atrfs](https://github.com/pcrow/atari_8bit_utils)** — mountet ein
-  `.atr`-Image per FUSE als normales Ubuntu-Verzeichnis (kein Root
-  nötig), danach normales `cp`/Dateimanager möglich:
+- **[atrfs](https://github.com/pcrow/atari_8bit_utils)** — mounts an
+  `.atr` image via FUSE as a normal Ubuntu directory (no root needed),
+  after which normal `cp`/file manager use works:
   ```
   mkdir ./atari_disk
   atrfs --name=game_disk.atr ./atari_disk
   cp myprog.bas ./atari_disk/
   fusermount -u ./atari_disk
   ```
-  Unterstützt DOS 2.0/LiteDOS vollständig, MyDOS/SpartaDOS mit
-  Einschränkungen.
-- **franny** — Kommandozeilen-Tool zum Auflisten/Extrahieren/Einfügen
-  ohne Mounten, u.a. für Skripte geeignet: `franny -l image.atr`
-  (Inhalt auflisten), `franny -g image.atr ATARIFILE.BAS localfile.bas`
-  (extrahieren), `franny -a image.atr localfile.bas ATARIFILE.BAS`
-  (einfügen). Kann auch neue Leer-Images erzeugen.
-- **[atari-tools](https://github.com/jhallen/atari-tools)** von Joseph
-  Allen — kompiliert schnell per `make`, liefert ein `atr`-Binary:
-  `atr image.atr ls` (auflisten), `atr image.atr put file.txt`
-  (einfügen).
-- **GUI-Alternative:** Altirra hat unter System → Disk Drives → Select
-  Drive → Explore einen Disk-Explorer, in den sich Dateien direkt vom
-  Ubuntu-Desktop hinein-draggen lassen (inkl. optionaler
-  Zeilenenden-Konvertierung) — auch `atari800` (`sudo apt install
-  atari800`) hat einen nativen Linux-Emulator als Alternative zu
-  Altirra/Wine.
+  Fully supports DOS 2.0/LiteDOS, MyDOS/SpartaDOS with limitations.
+- **franny** — command-line tool for listing/extracting/inserting
+  without mounting, suitable for scripts among other things:
+  `franny -l image.atr` (list contents), `franny -g image.atr
+  ATARIFILE.BAS localfile.bas` (extract), `franny -a image.atr
+  localfile.bas ATARIFILE.BAS` (insert). Can also create new blank
+  images.
+- **[atari-tools](https://github.com/jhallen/atari-tools)** by Joseph
+  Allen — builds quickly via `make`, produces an `atr` binary:
+  `atr image.atr ls` (list), `atr image.atr put file.txt` (insert).
+- **GUI alternative:** Altirra has a disk explorer under System → Disk
+  Drives → Select Drive → Explore, into which files can be dragged
+  directly from the Ubuntu desktop (including optional line-ending
+  conversion) — `atari800` (`sudo apt install atari800`) also has a
+  native Linux emulator as an alternative to Altirra/Wine.
 
-**Wichtig bei reinen ASCII-`.bas`-Textdateien:** Der Atari erwartet
-ATASCII-Zeilenenden — ein einzelnes `CR` (`\r`, ASCII 155), NICHT Linux-
-`LF` (`\n`) oder Windows-`CRLF` (`\r\n`). Falls eine skriptgenerierte
-`.bas`-Datei beim Laden (`ENTER "D:MYPROG.BAS"`) nicht sauber läuft,
-vorher die Zeilenenden mit `awk`/`sed` auf `\r` umwandeln.
+**Important for plain ASCII `.bas` text files:** the Atari expects
+ATASCII line endings — a single `CR` (`\r`, ASCII 155), NOT Linux `LF`
+(`\n`) or Windows `CRLF` (`\r\n`). If a script-generated `.bas` file
+doesn't load cleanly (`ENTER "D:MYPROG.BAS"`), convert the line
+endings to `\r` with `awk`/`sed` first.
 
-**Status:** Aus einer KI-Recherche übernommen, **noch nicht ausprobiert**
-— nützlich als Ausgangspunkt, falls das manuelle Altirra-Paste durch ein
-Skript ersetzt werden soll (z.B. für automatisiertes Ausrollen neuer
-Client-Stände auf mehrere FujiNet-SD-Karten).
+**Status:** adopted from AI research, **not yet tried** — useful as a
+starting point if the manual Altirra paste ever gets replaced by a
+script (e.g. for automated rollout of new client versions to multiple
+FujiNet SD cards).
 
 ### Commodore 64 (Meatloaf)
 
-VICE installieren — enthält `petcat`, das eine Text-Datei als Tokens
-speichert: `petcat -w2 -o OUT.PRG -- IN.TXT` (aus `xyz.bas` wird
-`xyz.prg`). Danach über das Meatloaf-Webinterface auf den Flash-Speicher
-hochladen.
+Install VICE — it includes `petcat`, which stores a text file as
+tokens: `petcat -w2 -o OUT.PRG -- IN.TXT` (`xyz.bas` becomes
+`xyz.prg`). Then upload it to the flash storage via the Meatloaf web
+interface.
 
-**Achtung:** Ein HTTP-Aufruf aus BASIC heraus verstellt offenbar das
-Destination-Verzeichnis für Device 8. Zurücksetzen mit `LOAD"CD^",8`
-(Pfeil-nach-oben-Zeichen, PETSCII `$5E`), danach `LOAD"$",8` — dann ist
-wieder alles normal.
+**Watch out:** an HTTP call from within BASIC apparently changes the
+destination directory for device 8. Reset it with `LOAD"CD^",8`
+(up-arrow character, PETSCII `$5E`), then `LOAD"$",8` — after that,
+everything's back to normal.
 
 ### Schneider/Amstrad CPC (M4)
 
-Sonderfall wegen des AMSDOS-Headers (siehe auch Lektion oben zum
-"Line too long"-Fehler). Workflow: WinAPE starten, neue Diskette
-erstellen und formatieren, das BASIC-Programm per Paste in die Emulation
-kopieren, auf der virtuellen Diskette speichern. Anschließend über das
-M4-Webinterface diese Diskette auf die SD-Karte des M4 kopieren, dort
-auswählen und das Programm per Browser auf dem CPC starten.
+A special case because of the AMSDOS header (see also the "Line too
+long" lesson above). Workflow: start WinAPE, create and format a new
+disk, paste the BASIC program into the emulation, save it to the
+virtual disk. Then copy that disk onto the M4's SD card via the M4 web
+interface, select it there, and start the program via browser on the
+CPC.
 
-Bekannte Einschränkung: Beim `|HTTPMEM`-Aufruf (CALL der HTTP-Seite) wird
-jede andere Verarbeitung (insbesondere Joystick-Abfrage) blockiert — das
-Spielgefühl ist auf dem CPC dadurch spürbar weniger flüssig als auf den
-anderen Plattformen. Ein reduzierter Puffer hilft etwas, die Grenzen
-bleiben aber deutlich spürbar.
+Known limitation: during an `|HTTPMEM` call (CALL to the HTTP page),
+all other processing (in particular joystick polling) is blocked —
+game feel on the CPC is noticeably less smooth than on the other
+platforms as a result. A reduced buffer helps a little, but the limits
+remain clearly noticeable.
 
-#### Möglicher einfacherer Weg: `MERGE` statt WinAPE-Umweg (noch nicht getestet)
+#### Possibly simpler route: `MERGE` instead of the WinAPE detour (not yet tested)
 
-Der WinAPE-Umweg oben ist nötig, weil eine **tokenisierte** BASIC-Datei
-(normales `SAVE"datei"`) einen korrekten 128-Byte-AMSDOS-Header braucht,
-den das M4-Webinterface beim Hochladen einer rohen Textdatei nicht von
-selbst erzeugt (siehe "Line too long"-Lektion oben). Es gibt aber einen
-möglichen Weg, dieses Header-Problem komplett zu umgehen, indem man gar
-keine tokenisierte Datei braucht:
+The WinAPE detour above is necessary because a **tokenized** BASIC
+file (a normal `SAVE"file"`) needs a correct 128-byte AMSDOS header,
+which the M4 web interface doesn't generate on its own when uploading
+a raw text file (see the "Line too long" lesson above). There is,
+however, a possible way to sidestep this header problem entirely by
+not needing a tokenized file at all:
 
-- Der CPC kann eine **rohe ASCII-Textdatei** (entspricht `SAVE"datei",A`)
-  direkt einlesen und ausführen — ganz ohne Tokenisierung/Header —, und
-  zwar über den `MERGE`-Befehl:
+- The CPC can read and execute a **raw ASCII text file** (equivalent
+  to `SAVE"file",A`) directly — with no tokenization/header at all —
+  via the `MERGE` command:
   ```
   NEW
-  MERGE "dateiname.txt"
+  MERGE "filename.txt"
   RUN
   ```
-  `MERGE` liest die Textdatei Zeile für Zeile genauso ein, als würde man
-  sie von Hand eintippen (ähnlich dem WinAPE-"Auto Type"/Atari-Paste, nur
-  direkt vom CPC-Interpreter erledigt statt vom Emulator).
-- Alternative dazu, als reines Zeilen-Einlesen ohne BASIC-Interpretation:
+  `MERGE` reads the text file in line by line exactly as if it were
+  being typed in by hand (similar to WinAPE's "Auto Type"/Atari paste,
+  just handled directly by the CPC interpreter instead of the
+  emulator).
+- Alternative to that, as a pure line read with no BASIC
+  interpretation:
   ```
-  OPENIN "dateiname.txt":LINE INPUT #9,a$:CLOSEIN
+  OPENIN "filename.txt":LINE INPUT #9,a$:CLOSEIN
   ```
-- **Warum das speziell beim M4 interessant ist:** Das M4-Board stellt die
-  SD-Karte als normales FAT32-Dateisystem bereit — für `MERGE` wird kein
-  `.DSK`-Image gebraucht. Die erzeugte `.bas`/`.txt`-Datei müsste sich
-  also direkt auf die SD-Karte kopieren lassen; am CPC dann mit `|DIR`
-  sichtbar machen und per `MERGE "dateiname.txt"` laden — potenziell ganz
-  ohne WinAPE/Emulator-Umweg.
-- Falls doch ein direktes `RUN"dateiname"` ohne vorheriges `MERGE`
-  gewünscht ist: ein 128-Byte-AMSDOS-Header lässt sich der Textdatei auch
-  nachträglich per Kommandozeilen-Tool (z.B. `2cpc`, `cpcfs` mit
-  `-t 0`/`-t 1` beim Import in ein `.DSK`-Image) voranstellen — macht die
-  Datei-für-Datei-Behandlung aber wieder komplizierter als der
-  `MERGE`-Weg oben.
+- **Why this is particularly interesting for the M4:** the M4 board
+  exposes the SD card as a normal FAT32 filesystem — `MERGE` needs no
+  `.DSK` image. The generated `.bas`/`.txt` file could therefore be
+  copied straight onto the SD card; made visible on the CPC with
+  `|DIR`, then loaded via `MERGE "filename.txt"` — potentially
+  entirely without the WinAPE/emulator detour.
+- If a direct `RUN"filename"` without a prior `MERGE` is wanted after
+  all: a 128-byte AMSDOS header can also be prepended to the text file
+  afterwards via a command-line tool (e.g. `2cpc`, `cpcfs` with
+  `-t 0`/`-t 1` when importing into a `.DSK` image) — but that makes
+  the file-by-file handling more complicated again than the `MERGE`
+  route above.
 
-**Status:** Aus einer KI-Recherche übernommen, **noch nicht auf echter
-M4-Hardware verifiziert** — falls es funktioniert, macht es den
-WinAPE-Umweg beim Übertragen neuer Client-Stände überflüssig. Vor dem
-nächsten Hardware-Test lohnt sich ein Ausprobieren mit einer kleinen
-Testdatei, bevor der komplette Client-Code darüber läuft.
+**Status:** adopted from AI research, **not yet verified on real M4
+hardware** — if it works, it makes the WinAPE detour unnecessary when
+transferring new client versions. Worth trying with a small test file
+before the next hardware test, before running the whole client code
+through it.
 
-## Testing ohne echte Hardware
+## Testing without real hardware
 
-Für den Server gibt es einen minimalen `pygame`-Stub (im ursprünglichen
-Sandbox-Environment unter `/home/claude/faketest/pygame_stub/`), der es
-erlaubt, den Server headless laufen zu lassen und per rohem TCP-Socket
-(Python `socket`-Modul) End-to-End-Tests zu fahren (HELLO senden, WAIT/
-START abwarten, etc.), ohne ein echtes pygame-Fenster zu benötigen. Dieser
-Stub ist NICHT Teil dieses Repos (war nur eine Sandbox-Hilfskonstruktion)
-— bei Bedarf leicht selbst nachbaubar (siehe `pygame.font`, `pygame.init`,
-`pygame.display` als minimal zu stubbende Oberfläche).
+For the server, there's a minimal `pygame` stub (in the original
+sandbox environment under `/home/claude/faketest/pygame_stub/`) that
+lets the server run headless and be driven through end-to-end tests
+via a raw TCP socket (Python's `socket` module) (send HELLO, wait for
+WAIT/START, etc.), without needing an actual pygame window. This stub
+is NOT part of this repo (it was just a sandbox helper) — easy to
+rebuild yourself if needed (see `pygame.font`, `pygame.init`,
+`pygame.display` as the minimal surface to stub).
 
-Für BASIC-Clients gibt es keine Möglichkeit, ohne echten Emulator
-(Altirra/Fujisan für Atari, VICE für C64, WinAPE/CPCEmu für CPC) sinnvoll
-zu testen — jede Änderung an einem `.bas`-Client sollte vor der Auslieferung
-zumindest auf Zeilennummern-Konsistenz geprüft werden (siehe oben), echte
-Funktionstests sind nur mit Emulator/Hardware durch den Nutzer möglich.
+For the BASIC clients, there's no way to test meaningfully without an
+actual emulator (Altirra/Fujisan for Atari, VICE for C64, WinAPE/CPCEmu
+for CPC) — every change to a `.bas` client should at least be checked
+for line-number consistency before shipping (see above); real
+functional testing is only possible via emulator/hardware, by the
+user.
 
-**Stand der Emulator-Tests pro Plattform (Nutzererfahrung):**
+**State of emulator testing per platform (from user experience):**
 
-- **Atari:** Fujisan 2.0.5beta unter Linux funktioniert zuverlässig als
-  Testumgebung für den FujiNet-Client. Unter Windows funktioniert dasselbe
-  Setup **nicht** — Ursache bisher unbekannt, noch nicht untersucht.
-- **C64 (WiC64):** VICE kann den WiC64-Client emulieren, d.h. der
-  experimentelle WiC64-Client lässt sich damit **ohne echte Hardware**
-  testen — nützlich gerade weil die WiC64-Hardware selten verfügbar ist.
-- **CPC (M4):** CPCEmu simuliert ein M4-Interface, das ist aber **bisher
-  nicht getestet** — Status unklar, könnte als nächster Schritt für
-  hardwarefreies CPC-Testing dienen.
-- **Basic-Programme in ein D64-Image packen** (für C64-Tests, z.B. mit
-  VICE): [d64-inspector](https://github.com/pdbuchan/d64-inspector)
-  (Autor: P. David Buchan, GPLv3) hat sich dafür als nützlich erwiesen —
-  nicht mehr im Repo gebündelt (siehe [`tools/README.md`](./tools/README.md)
-  für Download-/Baulinks, inkl. der für die PETSCII-Ansicht benötigten
-  [C64 TrueType](https://style64.org/c64-truetype)-Fontfamilie, Autor:
-  "Style"). Referenz-Disk-Images (u.a. für Atari/CPC) liegen unter
-  [`disk-images/`](./disk-images/), siehe README dort.
+- **Atari:** Fujisan 2.0.5beta on Linux works reliably as a test
+  environment for the FujiNet client. The same setup does **not** work
+  on Windows — cause unknown so far, not yet investigated.
+- **C64 (WiC64):** VICE can emulate the WiC64 client, i.e. the
+  experimental WiC64 client can be tested **without real hardware**
+  using it — especially useful since WiC64 hardware is rarely
+  available.
+- **CPC (M4):** CPCEmu simulates an M4 interface, but this is **not
+  tested yet** — status unclear, could serve as a next step for
+  hardware-free CPC testing.
+- **Packing BASIC programs into a D64 image** (for C64 tests, e.g.
+  with VICE): [d64-inspector](https://github.com/pdbuchan/d64-inspector)
+  (author: P. David Buchan, GPLv3) has proven useful for this — no
+  longer bundled in the repo (see [`tools/README.md`](./tools/README.md)
+  for download/build links, including the
+  [C64 TrueType](https://style64.org/c64-truetype) font family needed
+  for the PETSCII view, author: "Style"). Ready-made reference disk
+  images (incl. for Atari/CPC) live under
+  [`disk-images/`](./disk-images/), see the README there.
 
-### Foto-/FTP-Infrastruktur lokal simulieren
+### Simulating the photo/FTP infrastructure locally
 
-Ohne den echten Event-Fotoserver lässt sich `PHOTO_SOURCE = "FTP"` lokal
-mit einem simplen FTP-Server testen (aus dem Bilderverzeichnis heraus
-starten):
+Without the real event photo server, `PHOTO_SOURCE = "FTP"` can be
+tested locally with a simple FTP server (started from the images
+directory):
 
 ```bash
 # Linux
@@ -684,132 +679,127 @@ sudo python -m pyftpdlib -p 21
 python -m pyftpdlib -p 21
 ```
 
-Zum Testen bereits benutzte Besucher-PINs: `0001`, `0002`, `4711`,
-`0815`.
+Visitor PINs already used for testing: `0001`, `0002`, `4711`, `0815`.
 
-**Fertiges Test-Fixture:** [`assets/test_ftproot/`](./assets/test_ftproot/)
-enthält ein Demo-Foto (`photo.jpg`) und eine ASCII-Kunst-Datei
-(`ascii-terminal.txt`) unter der PIN `MUSTER`, heruntergeladen vom echten
-`fotofix.classic-computing.de`-Server. `ascii-terminal.txt` wird seit der
-Client-Vereinfachung vom 2026-09-12 von keinem Client mehr abgerufen,
-bleibt aber als Fixture liegen (harmlos, minimaler Pflegeaufwand). Einfach
-den pyftpdlib-Befehl oben aus `assets/test_ftproot/` heraus starten und
-mit PIN `MUSTER` testen,
-statt eigene Testbilder anzulegen.
+**Ready-made test fixture:** [`assets/test_ftproot/`](./assets/test_ftproot/)
+contains a demo photo (`photo.jpg`) and an ASCII-art file
+(`ascii-terminal.txt`) under PIN `MUSTER`, downloaded from the real
+`fotofix.classic-computing.de` server. `ascii-terminal.txt` hasn't
+been fetched by any client since the 2026-09-12 client simplification,
+but stays in place as a fixture (harmless, minimal upkeep). Just start
+the pyftpdlib command above from `assets/test_ftproot/` and test with
+PIN `MUSTER`, instead of setting up your own test images.
 
-## Ideen für später
+## Ideas for later
 
-- **`pygame` → `pygame-ce`/`pygame-ng` erwägen:** Klassisches `pygame` ist
-  unmaintained; ein Community-Fork würde aktuellere Wartung/Fixes bringen.
-  Kein akuter Handlungsbedarf, aber bei größeren Server-Änderungen im
-  Hinterkopf behalten.
-- **Soundeffekte aus dem Tron-Film (1982):** Ein paar kurze Audioclips
-  (Bit-artige "yes"/"no", MCP-artige Zeilen) liegen lokal bereit für
-  eine mögliche spätere Integration (z.B. als Sound-Effekte im Server bei
-  Spielstart/-ende). **Bewusst nicht ins Repo/Git aufgenommen** — es
-  handelt sich um Ausschnitte aus urheberrechtlich geschütztem
-  Filmmaterial (Disney), das sollte vor einer Verwendung/Veröffentlichung
-  nochmal bewusst abgewogen werden, insbesondere falls das Repo je
-  öffentlich gehostet wird.
-- **Vierte Plattform: Apple II via FujiNet (nur falls am Ende Zeit übrig
-  ist):** FujiNet unterstützt offiziell auch Apple II/III, mit demselben
-  `N:`-Netzwerk-Device-Konzept wie beim Atari, inklusive rohem TCP —
-  Methode 1 (Port 6502) sollte sich also direkt anwenden lassen, ganz
-  ohne Server-Änderung (siehe Abschnitt "Erweiterung um weitere
-  Retro-Computer" oben). Kein Apple II in der eigenen Hardware-Sammlung
-  bisher, geplanter erster Test über den "FujiNet Go"-Emulator auf
-  Handy/Tablet — reine Nice-to-have-Idee, keine Priorität vor CC2026.
+- **Consider `pygame` → `pygame-ce`/`pygame-ng`:** classic `pygame` is
+  unmaintained; a community fork would bring more current
+  maintenance/fixes. No urgent need to act, but keep it in mind for
+  bigger server changes.
+- **Sound effects from the Tron movie (1982):** a few short audio
+  clips (bit-style "yes"/"no", MCP-style lines) are ready locally for
+  possible later integration (e.g. as sound effects in the server at
+  game start/end). **Deliberately not added to the repo/git** — these
+  are excerpts from copyrighted film material (Disney), which should
+  be deliberately weighed again before any use/publication, especially
+  if the repo is ever hosted publicly.
+- **Fourth platform: Apple II via FujiNet (only if time is left at the
+  end):** FujiNet officially also supports Apple II/III, with the same
+  `N:` network-device concept as the Atari, including raw TCP —
+  method 1 (port 6502) should therefore apply directly, with no server
+  change (see the "Extending to further retro computers" section
+  above). No Apple II in the project's own hardware collection so far,
+  first test planned via the "FujiNet Go" emulator on phone/tablet —
+  purely a nice-to-have idea, no priority before CC2026.
   Quickstart: <https://github.com/FujiNetWIFI/fujinet-firmware/wiki/Apple-II-&-III-FujiNet-Quickstart-Guide>
-  - **Erster Client-Entwurf existiert bereits:**
+  - **A first client draft already exists:**
     [`clients/apple2/tron_apple2_client.bas`](./clients/apple2/tron_apple2_client.bas)
-    — **komplett unverifiziert, noch nie gelaufen**, weder auf echter
-    Hardware noch im Emulator. Anders als beim Atari-Client (CIO
-    `OPEN`/`PRINT#`/`INPUT#`) läuft Netzwerk auf Apple II über
-    FujiNet-spezifische Applesoft-"Ampersand"-Routinen
-    (`&NOPEN`/`&NREAD`/`&NWRITE`/`&NCLOSE`/`&NSTATUS`), die erst per
-    `BLOAD /FUJI.APPLE/FUJIAPPLE` + `CALL 16384` geladen werden müssen.
-    Aus dem FujiNet-Wiki (Seiten "Applesoft Network extensions" und
-    "N: SIO Command 'R' — Read") ließ sich kein vollständiges
-    funktionierendes TCP-Beispielprogramm finden — der Client ist aus
-    der reinen Parameter-Referenz gebaut, nicht aus einem bestätigten
-    Beispiel. **Bekannte offene Punkte, vor dem ersten Testlauf im
-    Hinterkopf behalten:**
-    - Ob `&NREAD`/`&NWRITE` blockieren oder sofort zurückkehren, ist in
-      der Doku nicht spezifiziert — der Client folgt dem empfohlenen
-      Muster "immer erst `&NSTATUS` fürs Byte-Waiting prüfen, dann erst
-      `&NREAD` mit genau dieser Byte-Anzahl" (die Doku warnt explizit
-      vor einem Fehler, wenn mehr Bytes angefragt werden als anliegen).
-    - Wie ein fehlgeschlagenes `&NOPEN` (z.B. Server nicht erreichbar)
-      sich bemerkbar macht, ist unbekannt — noch kein Applesoft-`ONERR
-      GOTO`-Fehlerhandling eingebaut (anders als das `TRAP`-basierte
-      beim Atari-Client).
-    - `PDL(0)`/`PDL(1)` fürs Joystick-Lesen: Center (`CX`/`CY`) und
-      Deadzone (`DZ`) sind im Kopf des Clients als Platzhalter (128/40)
-      hinterlegt — echte Paddle-/Joystick-Hardware braucht dafür
-      erfahrungsgemäß eine Kalibrierung pro Gerät.
-    - Applesoft unterscheidet Variablennamen historisch nur an den
-      ersten zwei Zeichen — der PIN-Eingabe-Variable bewusst `PN$`
-      genannt (nicht `PIN$`), da `PI` in Applesoft ein reserviertes
-      Schlüsselwort ist (Kreiszahl, dieselbe Fallgrube wie beim CPC,
-      siehe Muster 1 oben).
-    - Serverseitig ist `"APPLE2"` bereits in `PLATFORM_COLORS`/
-      `LOGO_NAME_CANDIDATES` in `server/tron_server.py` eingetragen
-      (amber Trail-Farbe), noch kein `assets/logos/apple2.*`-Bild
-      vorhanden.
-- **Fünfte Plattform: TI-99/4A via PicoPEB (ebenfalls nur bei Zeitüberschuss):**
-  PicoPEB ist eine DIY-Nachbildung der TI-Peripheral-Expansion-Box auf
-  Basis eines Raspberry Pi Pico W und emuliert u.a. ein RS232-Gerät mit
-  einem reinen Client-TCP-Socket (`PI.TCP=...` in der `autoload.cfg`) —
-  von TI BASIC/Extended BASIC aus per `OPEN #1:"RS232/2..."` (bzw. der
-  `PI.TCP`-Variante) und `PRINT #1:`/`INPUT #1:` angesprochen, vom Prinzip
-  her wie das serielle `N:`-Device beim Atari. Würde also ebenfalls auf
-  Methode 1 (rohes TCP, Port 6502) abgebildet, ohne Server-Änderung.
-  Genaue `OPEN`-Syntax fürs TCP-Client-Socket war in der verfügbaren
-  Doku nicht vollständig spezifiziert — reine Hands-on-Ermittlung auf
-  echter Hardware wie bei jeder bisherigen Plattform. Zusätzliche Hürden:
-  PicoPEB ist eine Lötbausatz-Platine (inkl. SMD-Bauteile), stock TI
-  BASIC ist langsam/string-limitiert (vermutlich Extended-BASIC-Modul
-  nötig), und es ist kein TI-99/4A in der eigenen Hardware-Sammlung
-  vorhanden — reine Nice-to-have-Idee, keine Priorität vor CC2026.
-  Doku: <https://github.com/hexbus/ppebcr-docs>
+    — **completely unverified, never run**, neither on real hardware
+    nor in an emulator. Unlike the Atari client (CIO
+    `OPEN`/`PRINT#`/`INPUT#`), networking on the Apple II runs through
+    FujiNet-specific Applesoft "ampersand" routines
+    (`&NOPEN`/`&NREAD`/`&NWRITE`/`&NCLOSE`/`&NSTATUS`), which first
+    have to be loaded via `BLOAD /FUJI.APPLE/FUJIAPPLE` + `CALL 16384`.
+    No complete working TCP example program could be found on the
+    FujiNet wiki (pages "Applesoft Network extensions" and "N: SIO
+    Command 'R' — Read") — the client is built from the plain
+    parameter reference, not from a confirmed example. **Known open
+    points, to keep in mind before the first test run:**
+    - Whether `&NREAD`/`&NWRITE` block or return immediately isn't
+      specified in the docs — the client follows the recommended
+      pattern of "always check `&NSTATUS` for bytes-waiting first,
+      only then `&NREAD` that exact byte count" (the docs explicitly
+      warn of an error if more bytes are requested than are actually
+      waiting).
+    - How a failed `&NOPEN` (e.g. server unreachable) makes itself
+      known is unknown — no Applesoft `ONERR GOTO` error handling
+      built in yet (unlike the `TRAP`-based one on the Atari client).
+    - `PDL(0)`/`PDL(1)` for joystick reading: center (`CX`/`CY`) and
+      deadzone (`DZ`) are placeholders (128/40) at the top of the
+      client — real paddle/joystick hardware tends to need
+      per-device calibration.
+    - Applesoft historically only distinguishes variable names by
+      their first two characters — the PIN-entry variable was
+      deliberately named `PN$` (not `PIN$`), since `PI` is a reserved
+      keyword in Applesoft (circle constant, the same trap as on the
+      CPC, see pattern 1 above).
+    - Server-side, `"APPLE2"` is already registered in
+      `PLATFORM_COLORS`/`LOGO_NAME_CANDIDATES` in
+      `server/tron_server.py` (amber trail color), no
+      `assets/logos/apple2.*` image exists yet.
+- **Fifth platform: TI-99/4A via PicoPEB (also only if time is left
+  over):** PicoPEB is a DIY recreation of the TI Peripheral Expansion
+  Box based on a Raspberry Pi Pico W, and among other things emulates
+  an RS232 device with a plain client TCP socket (`PI.TCP=...` in
+  `autoload.cfg`) — addressed from TI BASIC/Extended BASIC via
+  `OPEN #1:"RS232/2..."` (or the `PI.TCP` variant) and
+  `PRINT #1:`/`INPUT #1:`, in principle like the Atari's serial `N:`
+  device. Would therefore also map onto method 1 (raw TCP, port 6502),
+  with no server change. The exact `OPEN` syntax for the TCP client
+  socket wasn't fully specified in the available docs — pure hands-on
+  discovery on real hardware, like every platform so far. Additional
+  hurdles: PicoPEB is a solder-it-yourself board (incl. SMD parts),
+  stock TI BASIC is slow/string-limited (an Extended BASIC module is
+  probably needed), and there's no TI-99/4A in the project's own
+  hardware collection — purely a nice-to-have idea, no priority before
+  CC2026. Docs: <https://github.com/hexbus/ppebcr-docs>
 
-## Aktueller Stand (siehe auch git log für Details)
+## Current status (see also git log for details)
 
-- **Server**: stabil, produktiv im Einsatz getestet über viele Spiele.
-- **Alle vier Clients** (Atari, C64/Meatloaf, C64/WiC64, CPC): am
-  2026-09-12 UI-seitig radikal vereinfacht — ASCII-Kunst-Anzeige,
-  Terminal-Tippeffekt und MCP-Storyline entfernt, siehe Abschnitt
-  "UI-Vereinfachung aller Clients" oben. C64/Meatloaf und CPC/M4 am
-  2026-09-19 auf echter Hardware nach der Vereinfachung erneut
-  verifiziert (siehe direkt unten); Atari und C64/WiC64 stehen das
-  noch aus.
-- **Atari-Client**: bisher stabil (vor der Vereinfachung). Am
-  2026-09-20 in mehreren echten, gesteuerten Cross-Platform-Matches
-  gegen den CPC-Client bestätigt (siehe unten).
-- **C64-Client (Meatloaf)**: Session-Mismatch-Bug (ungeprüfte
-  Join-Antwort) am 2026-09-12 auf echter Hardware gefunden und gefixt.
-  Am 2026-09-19 auf echter Hardware erneut verifiziert (`/tick`-Latenz
-  ~300 ms, siehe Vergleichsmessung im WiC64-Abschnitt oben) - Fix hält.
-  Der weitere Groß-/Kleinschreibungs-Fix vom 2026-09-20 ("Hauptschleife
-  pruefte START/ERR/END nur in Kleinschreibung", siehe Meatloaf-
-  Abschnitt oben) am selben Tag in mehreren echten, gesteuerten
-  Cross-Platform-Matches gegen den CPC-Client bestätigt - "USE
-  JOYSTICK" erscheint jetzt zuverlässig.
-- **CPC-Client**: bisher stabil (vor der Vereinfachung); denselben
-  Join-Antwort-Fix wie beim Meatloaf-Client vorsorglich mitbekommen.
-  Am 2026-09-19 auf echter Hardware nach der Vereinfachung verifiziert
-  (`/tick`-Latenz ~550 ms, siehe Vergleichsmessung oben). Am 2026-09-20,
-  jetzt mit angeschlossenen Joysticks, mehrere echte gesteuerte
-  Cross-Platform-Matches gegen Atari und gegen Meatloaf gespielt -
-  Ergebnisse wechselten zwischen beiden Seiten, kein einseitiger
-  Nachteil erkennbar trotz unterschiedlicher `/tick`-Latenz. Siehe
-  "Erster ECHTER Hardware-Crossplay-Test mit Steuerung" im
-  WiC64-Abschnitt oben.
-- **C64-Client (WiC64)**: experimentell, keine physische Hardware
-  vorhanden (siehe "Ideen für später"/Testcheckliste). Spielverbindung
-  (`/join`/`/tick`) hatte einen Bug (URL-Großschreibung + fehlende
-  Antwort-Prüfung), Fix am 2026-09-11 eingebaut. Am 2026-09-19 im
-  VICE-Emulator gegen einen TCP-Bot erfolgreich gespielt (funktioniert
-  grundsätzlich) — dabei aber eine `/tick`-Latenz von 1272–1290 ms
-  gemessen, siehe Detail-Eintrag oben im WiC64-Abschnitt. Weiterhin
-  nicht auf echter WiC64-Hardware verifiziert.
+- **Server**: stable, tested in production use over many games.
+- **All four clients** (Atari, C64/Meatloaf, C64/WiC64, CPC): radically
+  simplified on the UI side on 2026-09-12 — ASCII-art display,
+  terminal typing effect and MCP storyline removed, see the "UI
+  simplification of all clients" section above. C64/Meatloaf and
+  CPC/M4 re-verified on real hardware after the simplification on
+  2026-09-19 (see directly below); Atari and C64/WiC64 still have
+  that ahead of them.
+- **Atari client**: stable so far (before the simplification).
+  Confirmed on 2026-09-20 in several real, steered cross-platform
+  matches against the CPC client (see below).
+- **C64 client (Meatloaf)**: session-mismatch bug (unchecked join
+  response) found and fixed on real hardware on 2026-09-12.
+  Re-verified on real hardware on 2026-09-19 (`/tick` latency
+  ~300 ms, see the comparison measurement in the WiC64 section above)
+  - the fix holds. The further case-sensitivity fix from 2026-09-20
+  ("main loop only checked START/ERR/END in lowercase", see the
+  Meatloaf section above) confirmed the same day in several real,
+  steered cross-platform matches against the CPC client - "USE
+  JOYSTICK" now shows up reliably.
+- **CPC client**: stable so far (before the simplification); got the
+  same join-response fix as the Meatloaf client as a precaution.
+  Verified on real hardware after the simplification on 2026-09-19
+  (`/tick` latency ~550 ms, see the comparison measurement above). On
+  2026-09-20, now with joysticks connected, several real steered
+  cross-platform matches played against Atari and against Meatloaf -
+  results alternated between both sides, no one-sided disadvantage
+  apparent despite the differing `/tick` latency. See "First REAL
+  hardware crossplay test with steering" in the WiC64 section above.
+- **C64 client (WiC64)**: experimental, no physical hardware available
+  (see "Ideas for later"/test checklist). The game connection
+  (`/join`/`/tick`) had a bug (URL uppercase + missing response
+  check), fixed on 2026-09-11. Played successfully in the VICE
+  emulator against a TCP bot on 2026-09-19 (works in principle) - but
+  a `/tick` latency of 1272–1290 ms was measured in the process, see
+  the detail entry in the WiC64 section above. Still not verified on
+  real WiC64 hardware.

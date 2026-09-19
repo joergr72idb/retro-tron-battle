@@ -1,42 +1,42 @@
 <#
 .SYNOPSIS
-  Retro-Tron-Bot fuer Windows/PowerShell - simuliert einen zweiten Spieler,
-  praktisch fuer Demos, wenn kein zweiter echter Rechner (oder Meatloaf/M4-
-  Board) zur Hand ist.
+  Retro Tron bot for Windows/PowerShell - simulates a second player,
+  handy for demos when a second real computer (or Meatloaf/M4 board) isn't
+  on hand.
 
 .DESCRIPTION
-  Verbindet sich per TCP mit dem Tron-Server, schickt HELLO, und dreht dann
-  - sobald das Spiel gestartet ist - auf einem Timer zufaellig ab (nicht
-  Tick-getriggert, da der Server keine Tick-Daten mehr sendet; das Spielfeld
-  existiert nur noch serverseitig). Entspricht funktional tron_bot.sh, laeuft
-  aber nativ unter Windows ohne WSL oder netcat.
+  Connects to the Tron server via TCP, sends HELLO, and then - once the
+  game has started - turns randomly on a timer (not tick-triggered, since
+  the server no longer sends tick data; the playfield only exists
+  server-side now). Functionally equivalent to tron_bot.sh, but runs
+  natively on Windows without WSL or netcat.
 
 .PARAMETER ServerHost
-  IP oder Hostname des Spiel-Servers. Standard: 127.0.0.1
+  IP or hostname of the game server. Default: 127.0.0.1
 
 .PARAMETER Port
-  TCP-Port des Spiel-Servers. Standard: 6502
+  TCP port of the game server. Default: 6502
 
 .PARAMETER Platform
-  Plattform-Code, der gemeldet wird, z.B. C64, CPC, ATARI. Standard: C64
+  Platform code reported to the server, e.g. C64, CPC, ATARI. Default: C64
 
 .PARAMETER PlayerName
-  Anzeigename. Standard: PSBot
+  Display name. Default: PSBot
 
 .PARAMETER Pin
-  Optionale Besucher-Foto-PIN, falls die Foto/Logo-Funktion mitgetestet werden soll.
+  Optional visitor photo PIN, if you want to test the photo/logo feature too.
 
 .PARAMETER TurnChance
-  Grob 1-zu-N Poll-Durchlaeufe loesen eine zufaellige Drehung aus. Standard: 12
+  Roughly 1-in-N poll cycles trigger a random turn. Default: 12
 
 .EXAMPLE
   .\tron_bot.ps1 -ServerHost 192.168.1.50 -Platform C64 -PlayerName "Commodore64"
 
 .NOTES
-  Falls das Ausfuehren mit "die Ausfuehrung von Skripts ist auf diesem System
-  deaktiviert" verweigert wird, entweder so aufrufen:
+  If running it is refused with "running scripts is disabled on this
+  system", either call it like this:
     powershell -ExecutionPolicy Bypass -File .\tron_bot.ps1 ...
-  oder einmalig fuer die aktuelle Sitzung:
+  or once for the current session:
     Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 #>
 
@@ -51,7 +51,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $PollIntervalMs = 200
-$MaxIdlePolls = 150   # ~30s ganz ohne Serverantwort = aufgeben
+$MaxIdlePolls = 150   # ~30s with no server response at all = give up
 
 Write-Host "[$Platform/$PlayerName] connecting to $ServerHost`:$Port ..."
 
@@ -59,7 +59,7 @@ try {
     $client = New-Object System.Net.Sockets.TcpClient
     $client.Connect($ServerHost, $Port)
 } catch {
-    Write-Error "Konnte nicht mit $ServerHost`:$Port verbinden - $_"
+    Write-Error "Couldn't connect to $ServerHost`:$Port - $_"
     exit 1
 }
 
@@ -77,7 +77,7 @@ $helloLine = "HELLO $Platform $PlayerName"
 if ($Pin -ne "") { $helloLine += " $Pin" }
 Send-Line $helloLine
 
-# --- Zeilenpuffer, tolerant gegenueber CR, LF oder CRLF als Trenner ---
+# --- Line buffer, tolerant of CR, LF, or CRLF as a separator ---
 $script:recvBuffer = New-Object System.Text.StringBuilder
 $readBuf = New-Object byte[] 512
 

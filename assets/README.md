@@ -1,33 +1,31 @@
 # assets/
 
-Lokale Bild- und Font-Dateien fuer den Server (`server/tron_server.py`),
-referenziert per relativem Pfad ab dem Projekt-Root — dorthin kopieren
-und committen, dann laeuft der Server auf jeder Maschine ohne Pfade
-anzupassen.
+Local image and font files for the server (`server/tron_server.py`),
+referenced by relative path from the project root — copy and commit
+them there, then the server runs unchanged on any machine without
+adjusting paths.
 
 ## assets/logos/
 
-Firmenlogos + Vereinslogo. Dateiname pro Plattform (erste passende
-Erweiterung gewinnt: .png, .jpg, .jpeg, .gif, .bmp, jeweils gross-
-oder kleingeschrieben):
+Company logos + club logo. Filename per platform (first matching
+extension wins: .png, .jpg, .jpeg, .gif, .bmp, either upper- or
+lowercase):
 
 - `atari.*` — Atari
-- `commodore.*` oder `c64.*` — Commodore 64
-- `schneider.*`, `cpc.*` oder `amstrad.*` — Schneider/Amstrad CPC
-- `apple2.*` oder `apple.*` — Apple II (experimentell, siehe CLAUDE.md)
-- `logo.*` — Vereinslogo der Veranstaltung (oben rechts, dauerhaft
-  sichtbar)
+- `commodore.*` or `c64.*` — Commodore 64
+- `schneider.*`, `cpc.*` or `amstrad.*` — Schneider/Amstrad CPC
+- `apple2.*` or `apple.*` — Apple II (experimental, see CLAUDE.md)
+- `logo.*` — the event's club logo (top right, always visible)
 
-Firmenlogos werden bei jedem neuen Match neu geladen (kein Neustart
-noetig). Das Vereinslogo wird nur einmal beim Serverstart geladen.
+Company logos are reloaded on every new match (no restart needed).
+The club logo is loaded only once at server startup.
 
 ## assets/font/
 
-Die `.ttf`-Datei fuer den Demo-Scrolltext, siehe `SCROLL_FONT_PATH` in
-`server/tron_server.py`. Leer lassen (`SCROLL_FONT_PATH = ""`) fuer die
-Standard-Schrift, falls keine eigene Font verwendet werden soll.
+The `.ttf` file for the demo scroll text, see `SCROLL_FONT_PATH` in
+`server/tron_server.py`. Leave empty (`SCROLL_FONT_PATH = ""`) to use
+the default font if you don't want a custom one.
 
-**Lizenz beachten:** Falls die Font (z.B. ein "Flynn"/TRON-Fanfont)
-nur fuer den persoenlichen Gebrauch freigegeben ist, ggf. vor einem
-oeffentlichen Push pruefen, ob eine Weiterverteilung ueber das
-Git-Repo erlaubt ist.
+**Mind the license:** if the font (e.g. a "Flynn"/TRON fan font) is
+only cleared for personal use, check before any public push whether
+redistributing it via the git repo is actually allowed.

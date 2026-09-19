@@ -1,38 +1,37 @@
 # Tools
 
-## Eigene Diagnose-/Testprogramme
+## Own diagnostic/test programs
 
-Kleine, isolierte `.bas`-Testprogramme, entstanden beim Eingrenzen von
-Plattform-Eigenheiten (siehe `CLAUDE.md`) - kein Teil des eigentlichen
-Spiels, aber nützlich als Ausgangspunkt für ähnliche Diagnosen auf einer
-neuen Plattform:
+Small, isolated `.bas` test programs, written while narrowing down
+platform quirks (see `CLAUDE.md`) - not part of the actual game, but
+useful as a starting point for similar diagnostics on a new platform:
 
-- `atari_http_test.bas` - isolierter FujiNet-`N:HTTP`-Test
-- `atari_joystick_test.bas` / `joystick_network_test.bas` - Atari-Joystick-Port-Tests
-  (Standalone bzw. mit Networking, siehe unten)
-- `c64_joystick_test.bas` - Standalone-Joystick-Test fuer C64, zeigt Port 1
-  ($dc01) und Port 2 ($dc00) gleichzeitig live an, um das Keyboard-Scan-
-  Ghosting-Problem (siehe `CLAUDE.md`) direkt sichtbar zu machen
-- `cpc_joystick_test.bas` - Standalone-Joystick-Test fuer Schneider CPC
-  (`JOY(0)`, raw + dekodiert)
-- `meatloaf_netztest.bas` - isolierter Meatloaf-HTTP-Test
+- `atari_http_test.bas` - isolated FujiNet `N:HTTP` test
+- `atari_joystick_test.bas` / `joystick_network_test.bas` - Atari joystick
+  port tests (standalone and with networking, respectively, see below)
+- `c64_joystick_test.bas` - standalone joystick test for C64, shows port 1
+  ($dc01) and port 2 ($dc00) live at the same time, to directly visualize
+  the keyboard-scan ghosting problem (see `CLAUDE.md`)
+- `cpc_joystick_test.bas` - standalone joystick test for Schneider CPC
+  (`JOY(0)`, raw + decoded)
+- `meatloaf_netztest.bas` - isolated Meatloaf HTTP test
 
-## Externe Tools (nicht mehr im Repo gebündelt)
+## External tools (no longer bundled in the repo)
 
-Vorher lagen hier lokale Kopien der beiden folgenden Drittanbieter-Tools;
-um das Repo klein zu halten, sind sie jetzt nur noch verlinkt - bei Bedarf
-selbst von dort herunterladen:
+Local copies of the following two third-party tools used to live here;
+to keep the repo small, they're now just linked - download from there
+yourself if needed:
 
 ### d64-inspector
 
-GTK4-Programm zum Inspizieren/Editieren von D64-Diskettenimages (siehe
-`CLAUDE.md`, Abschnitt "Testen ohne echte Hardware", zum Verpacken von
-BASIC-Programmen in ein D64-Image für VICE-Tests).
+GTK4 program for inspecting/editing D64 disk images (see `CLAUDE.md`,
+section "Testing without real hardware", for packing BASIC programs
+into a D64 image for VICE tests).
 
-**Autor: P. David Buchan** (pdbuchan@gmail.com), Lizenz: GPLv3.
+**Author: P. David Buchan** (pdbuchan@gmail.com), license: GPLv3.
 Repo: <https://github.com/pdbuchan/d64-inspector>
 
-**Bauen unter Ubuntu/Debian:**
+**Building on Ubuntu/Debian:**
 
 ```bash
 sudo apt install build-essential pkg-config libgtk-4-dev
@@ -40,15 +39,14 @@ cd d64-inspector/src
 make
 ```
 
-Für die PETSCII-Anzeige vorher die C64-TrueType-Fonts installieren, siehe
-unten.
+For the PETSCII view, install the C64 TrueType fonts first, see below.
 
 ### C64 TrueType
 
-Die "C64 TrueType"-Fontfamilie, von `d64-inspector` für die
-PETSCII-Ansicht verwendet.
+The "C64 TrueType" font family, used by `d64-inspector` for the
+PETSCII view.
 
-**Autor: "Style"** (style64.org), Lizenz siehe Downloadseite (u.a.: nicht
-umbenennen/verändern, nur als Teil einer frei verfügbaren
-Software-Sammlung weitergeben). Download/Projektseite:
+**Author: "Style"** (style64.org), license see the download page
+(among other things: don't rename/modify, only redistribute as part
+of a freely available software collection). Download/project page:
 <https://style64.org/c64-truetype>

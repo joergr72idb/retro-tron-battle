@@ -1,119 +1,113 @@
 #!/usr/bin/env python3
 """
-Retro Tron Battle Server (v3 - zwei Teilnahme-Methoden)
+Retro Tron Battle Server (v3 - two participation methods)
 =====================================================
 
-Ein Spiel-Server fuer ein 2-Spieler Tron/Lightcycle-Duell, gespielt von
-echten Retro-Computern ueber ein Netzwerk:
+A game server for a 2-player Tron/lightcycle duel, played by real
+retro computers over a network:
 
-  - Atari XL/XE  + FujiNet   (N:TCP/IP-Geraet)   -> rohes TCP, Port 6502
-  - Commodore 64 + Meatloaf                      -> HTTP-Polling, Port 8080
-  - Amstrad CPC  + M4-Board                      -> HTTP-Polling, Port 8080
+  - Atari XL/XE  + FujiNet   (N:TCP/IP device)   -> raw TCP, port 6502
+  - Commodore 64 + Meatloaf                      -> HTTP polling, port 8080
+  - Amstrad CPC  + M4 board                      -> HTTP polling, port 8080
 
 DESIGN
 ------
-Die Retro-Computer STEUERN nur - sie zeichnen das Spielfeld nicht selbst.
-Das Spielfeld wird hier gezeichnet, auf dem PC, der diesen Server betreibt,
-in einem pygame-Fenster (gut geeignet fuer einen Beamer/groszen Monitor bei
-einer Veranstaltung). Dadurch bleibt die Aufgabe jedes Retro-Clients fast
-auf nichts beschraenkt auszer: Joystick lesen, bei Aenderung ein MOVE
-senden, und gelegentlich pruefen, ob das Spiel vorbei ist. Das wiederum
-bedeutet, dass die Retro-Clients nur sehr wenig Zeit damit verbringen, vom
-Socket zu lesen, waehrend gespielt wird - das umgeht Unzuverlaessigkeiten,
-die manche FujiNet-Setups zeigen, wenn Lese-/Schreibzugriffe auf demselben
-Kanal zu eng ineinander verschachtelt werden.
+The retro computers only STEER - they don't draw the playfield
+themselves. The playfield is drawn here, on the PC running this
+server, in a pygame window (well suited for a projector/large monitor
+at an event). This keeps each retro client's job down to almost
+nothing except: read the joystick, send a MOVE on change, and
+occasionally check whether the game is over. That in turn means the
+retro clients spend very little time reading from the socket while
+playing - which sidesteps unreliability some FujiNet setups show when
+reads/writes on the same channel get nested too tightly.
 
-Benoetigt: pip install pygame
+Requires: pip install pygame
 
-ZWEI WEGE ZUM MITSPIELEN - WARUM ES BEIDE GIBT
+TWO WAYS TO JOIN - WHY BOTH EXIST
 ------------------------------------------------
-Nicht jede Retro-Netzwerkerweiterung kann aus reinem BASIC heraus einen
-dauerhaften rohen TCP-Socket offen halten. FujiNet (Atari) kann das, daher
-spricht es das TCP-Protokoll weiter unten direkt auf Port 6502. Meatloaf
-(C64) und das M4-Board (Amstrad CPC) sind stattdessen auf einfache,
-einmalige HTTP-Anfragen ausgelegt - einen rohen Socket durch sie
-hindurchzuzwingen ist entweder aus BASIC heraus technisch gar nicht
-moeglich (M4) oder hat sich ueber viele Runden echter Hardware-Tests als
-unzuverlaessig erwiesen (Meatloaf). Beide fragen deshalb stattdessen eine
-kleine HTTP-Bruecke auf einem zweiten Port ab - siehe "HTTP-POLLING" weiter
-unten. Beide Zugangswege laufen durch exakt dieselbe Spiellogik
-(run_game() weiter unten); welchen Weg eine bestimmte Plattform nutzt, ist
-nur eine Frage dessen, was ihre Netzwerk-Hardware aus BASIC heraus
-tatsaechlich kann, kein Unterschied im Spiel selbst.
+Not every retro network add-on can keep a persistent raw TCP socket
+open from plain BASIC. FujiNet (Atari) can, so it speaks the TCP
+protocol below directly on port 6502. Meatloaf (C64) and the M4 board
+(Amstrad CPC) are instead built for simple, one-off HTTP requests -
+forcing a raw socket through them is either technically impossible
+from BASIC (M4) or has proven unreliable over many rounds of real
+hardware testing (Meatloaf). Both therefore poll a small HTTP bridge
+on a second port instead - see "HTTP POLLING" below. Both access paths
+run through exactly the same game logic (run_game() below); which path
+a given platform uses is purely a question of what its network
+hardware can actually do from BASIC, not a difference in the game
+itself.
 
-PROTOKOLL 1: ROHES TCP (Port 6502, z.B. Atari/FujiNet)
+PROTOCOL 1: RAW TCP (port 6502, e.g. Atari/FujiNet)
 --------------------------------------------------------
 Client -> Server:
-    HELLO <PLATTFORM> <NAME> [PIN]  z.B. "HELLO ATARI Zorg AFC6GHJ"
-                                   PIN ist optional - eine Besucher-Foto-ID
-                                   vom Event. Einfach weglassen (oder nichts
-                                   nach NAME senden), um ohne Foto zu
-                                   spielen.
-    MOVE <U|D|L|R>                Richtungswechsel (wird ignoriert, falls
-                                   es eine direkte Kehrtwende in die eigene
-                                   Spur waere)
-    BYE                           Verbindung trennen / aufgeben
+    HELLO <PLATFORM> <NAME> [PIN]   e.g. "HELLO ATARI Zorg AFC6GHJ"
+                                   PIN is optional - a visitor photo ID
+                                   from the event. Just leave it out
+                                   (or send nothing after NAME) to play
+                                   without a photo.
+    MOVE <U|D|L|R>                 direction change (ignored if it
+                                   would be a direct reversal into your
+                                   own trail)
+    BYE                            disconnect / give up
 
 Server -> Client:
-    WAIT                          verbunden, wartet auf Gegner
-    START <w> <h> <x1> <y1> <x2> <y2> <deinespielernr> <p1plat> <p2plat>
-                                   signalisiert "Steuerung beginnt jetzt" -
-                                   Clients muessen mit den Feldern nichts
-                                   weiter tun, auszer zu bemerken, dass die
-                                   Zeile angekommen ist
-    END WIN <PLATTFORM> <NAME>    Spiel vorbei, jemand hat gewonnen
-    END DRAW                      Spiel vorbei, gleichzeitiger Crash
-    STATS GAMES <n> <PLATTFORM> <n> <PLATTFORM> <n> ... DRAWS <n>
-                                   direkt nach END gesendet, laufende
-                                   Gesamtzahlen
+    WAIT                           connected, waiting for an opponent
+    START <w> <h> <x1> <y1> <x2> <y2> <yourplayernum> <p1plat> <p2plat>
+                                   signals "steering starts now" -
+                                   clients don't need to do anything
+                                   further with the fields, other than
+                                   notice that the line arrived
+    END WIN <PLATFORM> <NAME>     game over, someone won
+    END DRAW                      game over, simultaneous crash
+    STATS GAMES <n> <PLATFORM> <n> <PLATFORM> <n> ... DRAWS <n>
+                                   sent right after END, running totals
 
-Es gibt in diesem Protokoll keinen TICK-Broadcast - das Spielfeld existiert
-nur im Speicher dieses Prozesses und auf dem Bildschirm. Bots, die das
-Spiel "sehen" wollen (wie tron_bot.sh), sollten einen eigenen Timer nutzen,
-um zu entscheiden, wann sie abbiegen, statt auf eingehende Tick-Daten zu
-reagieren.
+This protocol has no TICK broadcast - the playfield only exists in
+this process's memory and on the screen. Bots that want to "see" the
+game (like tron_bot.sh) should use their own timer to decide when to
+turn, instead of reacting to incoming tick data.
 
-Zwischen dem Paaren und dem ersten Tick gibt es einen kurzen Countdown auf
-dem Bildschirm (3, 2, 1, dann ein abschlieszender Spruch), sichtbar im
-pygame-Fenster. Richtungswechsel, die waehrend des Countdowns gesendet
-werden, werden schon eingelesen und angewendet, aber niemand bewegt sich
-tatsaechlich, bis der Spruch erscheint - das ist rein eine Pause auf der
-Anzeige-Seite, keine neuen Protokollnachrichten.
+Between pairing and the first tick there's a short countdown on
+screen (3, 2, 1, then a closing line), visible in the pygame window.
+Direction changes sent during the countdown are already read in and
+applied, but nobody actually moves until the closing line appears -
+that's purely a pause on the display side, not new protocol messages.
 
-Es spielen immer nur zwei Spieler gleichzeitig; wer sich verbindet,
-waehrend ein Spiel laeuft, wartet auf den naechsten freien Platz.
+Only ever two players play at a time; anyone connecting while a game
+is running waits for the next free slot.
 
-PROTOKOLL 2: HTTP-POLLING (Port 8080, z.B. C64/Meatloaf, CPC/M4)
+PROTOCOL 2: HTTP POLLING (port 8080, e.g. C64/Meatloaf, CPC/M4)
 --------------------------------------------------------------------
-Weder Meatloaf noch das M4-Board koennen das obige TCP-Protokoll aus BASIC
-heraus offen halten, daher fragen diese Clients stattdessen zwei einfache
-HTTP-GET-Routen auf einem zweiten Port ab:
+Neither Meatloaf nor the M4 board can keep the TCP protocol above open
+from BASIC, so these clients instead poll two simple HTTP GET routes
+on a second port:
 
-    GET /join/<plattform>/<name>/<pin-oder-NONE>  -> "SESSION <id>\n" + WAIT/START
-    GET /tick/<session>/<richtung-oder-N>          -> was auch immer fuer
-                                                       ihn ansteht, oder
-                                                       "ERR UNKNOWN SESSION"
-                                                       sobald die Session weg ist
+    GET /join/<platform>/<name>/<pin-or-NONE>  -> "SESSION <id>\n" + WAIT/START
+    GET /tick/<session>/<direction-or-N>        -> whatever is pending
+                                                    for them, or
+                                                    "ERR UNKNOWN SESSION"
+                                                    once the session is gone
 
-Eine Session verhaelt sich wie ein Briefkasten: /join legt eine an und gibt
-eine ID zurueck; jedes /tick liefert sowohl ein MOVE (oder "N" fuer "keine
-Aenderung") ab, als auch alles, was der Server seit dem letzten Abruf fuer
-diesen Spieler hinterlegt hat - das kann nichts sein, eine START-Zeile,
-oder END+STATS sobald das Spiel zu Ende ist. Sessions bleiben nach
-Spielende noch eine kurze Gnadenfrist gueltig (siehe HTTPPlayerConn.close())
-damit der naechste Abruf eines Clients das Endergebnis auch ueber einen
-langsamen, echten HTTP-Roundtrip hinweg noch abholen kann - kommt der
-Abruf eines Clients erst nach dieser Gnadenfrist an, bekommt er
-"ERR UNKNOWN SESSION" und sollte das als "das Match ist definitiv vorbei,
-starte eine neue Session" behandeln.
+A session behaves like a mailbox: /join creates one and returns an ID;
+every /tick both delivers a MOVE (or "N" for "no change") and picks up
+whatever the server has queued for that player since the last poll -
+that can be nothing, a START line, or END+STATS once the game is over.
+Sessions stay valid for a short grace period after the game ends (see
+HTTPPlayerConn.close()) so that a client's next poll can still pick up
+the final result even across a slow, real HTTP round trip - if a
+client's poll arrives only after this grace period, it gets
+"ERR UNKNOWN SESSION" and should treat that as "the match is
+definitely over, start a new session".
 
-Diese Bruecke erzeugt intern exakt dieselben Player-artigen Objekte und
-laeuft durch exakt dasselbe run_game() wie die TCP-Clients - es ist nur
-eine andere Vordertuer (siehe HTTPPlayerConn weiter unten).
+This bridge internally creates exactly the same Player-like objects
+and runs through exactly the same run_game() as the TCP clients - it's
+just a different front door (see HTTPPlayerConn below).
 
-Aufruf mit:
+Run with:
     python3 tron_server.py [host] [tcp_port] [http_port]
-Standard: 0.0.0.0 6502 8080
+Defaults: 0.0.0.0 6502 8080
 """
 
 import asyncio
@@ -132,109 +126,108 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 # =============================================================================
-# VERSION - bei jeder inhaltlichen Aenderung erhoehen (siehe Konsole + Fenster)
+# VERSION - increment on every content change (shown in console + window)
 # =============================================================================
 SERVER_BUILD = 8
 # =============================================================================
 
 # =============================================================================
-# REPO-BASISORDNER - alle relativen Pfade unten (Font, Logos, CSV, Foto-Cache)
-# werden von hier aus aufgeloest, NICHT vom aktuellen Arbeitsverzeichnis. So
-# funktioniert der Server unveraendert, egal von wo aus er gestartet wird,
-# solange die Ordnerstruktur des Repos (server/ neben assets/) erhalten
-# bleibt - z.B. nach dem Kopieren des ganzen Repos auf einen anderen Rechner.
+# REPO BASE DIRECTORY - all relative paths below (font, logos, CSV, photo
+# cache) are resolved from here, NOT from the current working directory. This
+# way the server works unchanged no matter where it's started from, as long
+# as the repo's folder structure (server/ next to assets/) is preserved -
+# e.g. after copying the whole repo to another machine.
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # =============================================================================
 
 # =============================================================================
-# DEMO-SCROLLTEXT - LAEUFT DURCHS SPIELFELD, SOLANGE AUF SPIELER GEWARTET WIRD
+# DEMO SCROLL TEXT - RUNS ACROSS THE PLAYFIELD WHILE WAITING FOR PLAYERS
 # =============================================================================
-SCROLL_TEXT = (" RETRO TRON BATTLE - RTB ON THE CC 2026 AT CELLE ") # <-- EDIT: EIGENER TEXT
-SCROLL_FONT_PATH = os.path.join(BASE_DIR, "assets/font/Flynn-4v54.ttf")  # <-- EDIT: pfad zu einer eigenen .ttf-datei,
-                                     # oder "" leer lassen fuer die standard-schrift
-SCROLL_SPEED = 8           # pixel pro frame (bei ~30fps)
-SCROLL_FONT_SIZE = 180       # schriftgroesse in pixel - 64=doppelt, 96=dreifach
-SCROLL_WAVE_AMPLITUDE = 120  # pixel, hoehe der sinuswelle
-SCROLL_WAVE_FREQ = 0.10      # radiant pro zeichen, "enge" der welle
-SCROLL_WAVE_SPEED = 0.12     # radiant pro frame, geschwindigkeit der welle
-SCROLL_COLOR_SPEED = 0.02    # farbverlauf pro frame (regenbogen)
-# =============================================================================
-
-# =============================================================================
-# HIGHSCORE-ANZEIGE - WECHSELT SICH MIT DEM SCROLLTEXT AB, SOLANGE GEWARTET WIRD
-# =============================================================================
-SCROLL_LOOPS_BEFORE_HIGHSCORE = 2  # nach so vielen vollen durchlaeufen kommt die highscore-liste
-HIGHSCORE_DURATION = 20            # sekunden, die die liste steht, bevor der scroller weiterlaeuft
+SCROLL_TEXT = (" RETRO TRON BATTLE - RTB ON THE CC 2026 AT CELLE ") # <-- EDIT: YOUR OWN TEXT
+SCROLL_FONT_PATH = os.path.join(BASE_DIR, "assets/font/Flynn-4v54.ttf")  # <-- EDIT: path to your own .ttf file,
+                                     # or leave "" for the default font
+SCROLL_SPEED = 8           # pixels per frame (at ~30fps)
+SCROLL_FONT_SIZE = 180       # font size in pixels - 64=double, 96=triple
+SCROLL_WAVE_AMPLITUDE = 120  # pixels, height of the sine wave
+SCROLL_WAVE_FREQ = 0.10      # radians per character, "tightness" of the wave
+SCROLL_WAVE_SPEED = 0.12     # radians per frame, speed of the wave
+SCROLL_COLOR_SPEED = 0.02    # color gradient shift per frame (rainbow)
 # =============================================================================
 
 # =============================================================================
-# ERGEBNIS-PROTOKOLL (CSV) - EDIT FUER EUER SETUP
+# HIGH-SCORE DISPLAY - ALTERNATES WITH THE SCROLL TEXT WHILE WAITING
 # =============================================================================
-# Nach jedem beendeten Spiel wird eine Zeile an diese Datei angehaengt. Beim
-# Serverstart wird die Datei (falls vorhanden) eingelesen und der Punktestand
-# (Spiele gesamt, Siege pro Plattform, Unentschieden) daraus wiederhergestellt.
-# Fehlt die Datei, wird einfach bei 0 gestartet.
-RESULTS_CSV_PATH = os.path.join(BASE_DIR, "tron_results.csv")  # <-- EDIT: Pfad zur Ergebnis-CSV
+SCROLL_LOOPS_BEFORE_HIGHSCORE = 2  # the high-score list shows after this many full loops
+HIGHSCORE_DURATION = 20            # seconds the list stays up before the scroller resumes
+# =============================================================================
+
+# =============================================================================
+# RESULTS LOG (CSV) - EDIT FOR YOUR SETUP
+# =============================================================================
+# A line is appended to this file after every finished game. On server
+# start, the file (if present) is read back in and the score (total
+# games, wins per platform, draws) is restored from it. If the file is
+# missing, it simply starts at 0.
+RESULTS_CSV_PATH = os.path.join(BASE_DIR, "tron_results.csv")  # <-- EDIT: path to the results CSV
 CSV_FIELDNAMES = ["timestamp", "p1_platform", "p1_name", "p2_platform", "p2_name",
                    "result", "winner_platform", "winner_name"]
 # =============================================================================
 
 # =============================================================================
-# LOG-DATEI - ZUSAETZLICH ZUR KONSOLE, FUERS DEBUGGING WAEHREND HARDWARE-TESTS
+# LOG FILE - IN ADDITION TO THE CONSOLE, FOR DEBUGGING DURING HARDWARE TESTS
 # =============================================================================
-# Alles, was ueber log() (statt print()) ausgegeben wird, landet sowohl auf
-# der Konsole als auch angehaengt in dieser Datei - u.a. Steuerungsbefehle
-# (siehe drain_moves()) und ein durchsuchbarer Header pro Spielstart.
-LOG_FILE_PATH = os.path.join(BASE_DIR, "tron_server.log")  # <-- EDIT: Pfad zur Log-Datei
+# Everything output via log() (instead of print()) lands both on the
+# console and appended to this file - among other things steering
+# commands (see drain_moves()) and a searchable header per game start.
+LOG_FILE_PATH = os.path.join(BASE_DIR, "tron_server.log")  # <-- EDIT: path to the log file
 # =============================================================================
 
 # =============================================================================
-# EVENT-FOTO / LOGO-KONFIGURATION - DIESEN BLOCK FUER EURE VERANSTALTUNG ANPASSEN
+# EVENT PHOTO / LOGO CONFIGURATION - ADAPT THIS BLOCK FOR YOUR EVENT
 # =============================================================================
-# Besucher bekommen eine PIN (z.B. "MUSTER"), die mit einem Foto von ihnen
-# verknuepft ist, organisiert auf dem fotofix-Server als ein Ordner pro PIN
-# mit einem festen Dateinamen (HTTP_PHOTO_FILENAME, standardmaeszig
-# "photo.jpg") - z.B. PIN "MUSTER" -> ".../MUSTER/photo.jpg". Dieser Server
-# holt dieses Foto entweder per HTTP oder per FTP, je nach PHOTO_SOURCE
-# weiter unten, und zeigt es neben der Spielfeldseite dieses Besuchers,
-# zusammen mit dem Logo seines Computer-Herstellers. Beide Abrufmethoden
-# nutzen genau denselben <PIN>/<HTTP_PHOTO_FILENAME>-Pfad - HTTP braucht
-# nur eine vollstaendige URL (HTTP_PHOTO_BASE_URL), FTP braucht nur einen
-# Host (FTP_HOST, typischerweise eine IP-Adresse statt eines Hostnamens).
-PHOTO_SOURCE = "HTTP"  # <-- EDIT: "FTP" oder "HTTP" - schaltet die abrufmethode um
+# Visitors get a PIN (e.g. "MUSTER") linked to a photo of them,
+# organized on the fotofix server as one folder per PIN with a fixed
+# filename (HTTP_PHOTO_FILENAME, "photo.jpg" by default) - e.g. PIN
+# "MUSTER" -> ".../MUSTER/photo.jpg". This server fetches that photo
+# either via HTTP or via FTP, depending on PHOTO_SOURCE below, and
+# shows it next to that visitor's side of the playfield, together with
+# their computer manufacturer's logo. Both fetch methods use exactly
+# the same <PIN>/<HTTP_PHOTO_FILENAME> path - HTTP just needs a
+# complete URL (HTTP_PHOTO_BASE_URL), FTP just needs a host (FTP_HOST,
+# typically an IP address rather than a hostname).
+PHOTO_SOURCE = "HTTP"  # <-- EDIT: "FTP" or "HTTP" - switches the fetch method
 
-# --- FTP-Variante: Pfad auf dem FTP-Server = <FTP_REMOTE_DIR>/<PIN>/
-#     <HTTP_PHOTO_FILENAME> (dieselbe struktur wie unten bei HTTP, nur mit
-#     FTP_HOST als host statt einer kompletten URL) ---
-FTP_HOST = "192.168.17.158"     # <-- EDIT: die IP-Adresse des fotofix-servers
+# --- FTP variant: path on the FTP server = <FTP_REMOTE_DIR>/<PIN>/
+#     <HTTP_PHOTO_FILENAME> (same structure as HTTP below, just with
+#     FTP_HOST as the host instead of a full URL) ---
+FTP_HOST = "192.168.17.158"     # <-- EDIT: the fotofix server's IP address
 FTP_PORT = 21
-FTP_USER = "anonymous"           # <-- EDIT falls der FTP-server einen login braucht
+FTP_USER = "anonymous"           # <-- EDIT if the FTP server needs a login
 FTP_PASS = "anonymous@"          # <-- EDIT
-FTP_REMOTE_DIR = ""       # <-- EDIT: uebergeordneter ordner auf dem FTP-server,
-                           #     falls die PIN-ordner nicht direkt im root liegen
+FTP_REMOTE_DIR = ""       # <-- EDIT: parent folder on the FTP server,
+                           #     if the PIN folders aren't directly in the root
 
-# --- HTTP-Variante: URL = HTTP_PHOTO_BASE_URL + "/" + <PIN> + "/" +
-#     HTTP_PHOTO_FILENAME, z.B. PIN "MUSTER" ->
+# --- HTTP variant: URL = HTTP_PHOTO_BASE_URL + "/" + <PIN> + "/" +
+#     HTTP_PHOTO_FILENAME, e.g. PIN "MUSTER" ->
 #     http://fotofix.classic-computing.de/MUSTER/photo.jpg ---
 HTTP_PHOTO_BASE_URL = "http://fotofix.classic-computing.de"  # <-- EDIT
-HTTP_PHOTO_FILENAME = "photo.jpg"                             # <-- EDIT falls sich das je aendert
-                                                                #     (gilt fuer FTP UND HTTP)
+HTTP_PHOTO_FILENAME = "photo.jpg"                             # <-- EDIT if this ever changes
+                                                                #     (applies to FTP AND HTTP)
 
-PHOTO_CACHE_DIR = os.path.join(BASE_DIR, "photo_cache")  # heruntergeladene fotos werden hier gecacht (automatisch angelegt)
+PHOTO_CACHE_DIR = os.path.join(BASE_DIR, "photo_cache")  # downloaded photos get cached here (created automatically)
 
-# Lokaler, frei editierbarer Ordner fuer die drei Firmenlogos UND das
-# Vereinslogo der Veranstaltung (oben rechts, dauerhaft sichtbar). Jederzeit
-# Bilddateien hier reinlegen - fuer die Firmenlogos ist kein Neustart noetig
-# (werden bei jedem neuen Match frisch geladen); das Vereinslogo wird nur
-# einmal beim Start geladen (siehe event_logo_surf in pygame_loop()), ein
-# Neustart IST also noetig, falls sich dieses aendert. Jeder dieser
-# Dateinamen funktioniert pro Plattform (erster Treffer gewinnt):
-# atari.png/.jpg, commodore.png/.jpg, c64.png/.jpg, schneider.png/.jpg,
-# cpc.png/.jpg, amstrad.png/.jpg - plus "logo.png/.jpg/..." fuer das
-# Vereinslogo. Endungs-Abgleich ist unter Linux gross-/kleinschreibungs-
-# abhaengig, daher werden sowohl klein- als auch grossgeschriebene
-# Endungen geprueft (LOGO_EXTENSIONS weiter unten).
-LOGO_DIR = os.path.join(BASE_DIR, "assets/logos")               # <-- EDIT falls die logos woanders liegen sollen
+# Local, freely editable folder for the three company logos AND the
+# event's club logo (top right, always visible). Drop image files in
+# here any time - no restart needed for the company logos (freshly
+# loaded on every new match); the club logo is only loaded once at
+# startup (see event_logo_surf in pygame_loop()), so a restart IS
+# needed if that one changes. Any of these filenames works per
+# platform (first match wins): atari.png/.jpg, commodore.png/.jpg,
+# c64.png/.jpg, schneider.png/.jpg, cpc.png/.jpg, amstrad.png/.jpg -
+# plus "logo.png/.jpg/..." for the club logo. Extension matching is
+# case-sensitive on Linux, so both lower- and uppercase extensions are
+# checked (LOGO_EXTENSIONS below).
+LOGO_DIR = os.path.join(BASE_DIR, "assets/logos")               # <-- EDIT if the logos should live elsewhere
 LOGO_NAME_CANDIDATES = {
     "ATARI": ["atari"],
     "C64": ["commodore", "c64"],
@@ -245,12 +238,12 @@ LOGO_EXTENSIONS = [".png", ".PNG", ".jpg", ".JPG", ".jpeg", ".JPEG", ".gif", ".G
 # =============================================================================
 
 # =============================================================================
-# TRIBUTE-BILDSCHIRM - DRITTE WARTEBILDSCHIRM-ANSICHT (NACH SCROLLTEXT UND
-# HIGHSCORE-LISTE), WUERDIGT DIE PROJEKTE HINTER DEN WIFI-INTERFACES
+# TRIBUTE SCREEN - THIRD WAITING-SCREEN VIEW (AFTER THE SCROLL TEXT AND
+# HIGH-SCORE LIST), CREDITS THE PROJECTS BEHIND THE WIFI INTERFACES
 # =============================================================================
-TRIBUTE_TITLE = "SPECIAL THANKS TO"  # <-- EDIT: eigener text
-TRIBUTE_DURATION = 30  # sekunden, die der tribute-bildschirm steht
-TRIBUTE_ENTRIES = [  # (bild, credit-text, anzuzeigende url) - <-- EDIT fuer eigene credits
+TRIBUTE_TITLE = "SPECIAL THANKS TO"  # <-- EDIT: your own text
+TRIBUTE_DURATION = 30  # seconds the tribute screen stays up
+TRIBUTE_ENTRIES = [  # (image, credit text, url to display) - <-- EDIT for your own credits
     (os.path.join(BASE_DIR, "assets/logos/projects/fujinet.jpg"),
      "THE FUJINET PROJECT", "fujinet.online"),
     (os.path.join(BASE_DIR, "assets/logos/projects/meatloaf.png"),
@@ -263,29 +256,29 @@ TRIBUTE_ENTRIES = [  # (bild, credit-text, anzuzeigende url) - <-- EDIT fuer eig
 # =============================================================================
 
 # =============================================================================
-# FOTOFIX-DANK - VIERTE WARTEBILDSCHIRM-ANSICHT (NACH DEM TRIBUTE-BILDSCHIRM),
-# EINZELNES DANKESCHOEN - z.b. an eine person/ein projekt, das keinen platz
-# in der TRIBUTE_ENTRIES-liste oben braucht (aktuell: das FOTOFIX-Projekt,
-# siehe clients/c64/wic64-driver/README.md)
+# FOTOFIX THANKS - FOURTH WAITING-SCREEN VIEW (AFTER THE TRIBUTE SCREEN),
+# a single thank-you - e.g. to a person/project that doesn't need a
+# slot in the TRIBUTE_ENTRIES list above (currently: the FOTOFIX
+# project, see clients/c64/wic64-driver/README.md)
 # =============================================================================
 GREETING_IMAGE = os.path.join(BASE_DIR, "assets/logos/greetings/greeting.jpg")  # <-- EDIT
 GREETING_TEXT = "THANKS A LOT!"  # <-- EDIT
-GREETING_DURATION = 20  # sekunden, die der dank-bildschirm steht
+GREETING_DURATION = 20  # seconds the thank-you screen stays up
 # =============================================================================
 
 GRID_W = 60
 GRID_H = 32
-TICK_RATE = 8  # ticks/sek - bescheiden halten, das sind langsame clients auf echtem silizium
+TICK_RATE = 8  # ticks/sec - keep modest, these are slow clients on real silicon
 
-CELL = 18             # pixelgroesse einer gitterzelle im anzeigefenster
-HUD_HEIGHT = 120      # pixelhoehe des stats/status-headers
-FOOTER_HEIGHT = 44    # pixelhoehe des footers (KI-hinweis + credits, 2 zeilen)
-PANEL_W = 170         # breite jedes seitenpanels (logo + besucherfoto)
-FIELD_X = PANEL_W     # spielfeld beginnt rechts vom linken panel
+CELL = 18             # pixel size of one grid cell in the display window
+HUD_HEIGHT = 120      # pixel height of the stats/status header
+FOOTER_HEIGHT = 44    # pixel height of the footer (AI notice + credits, 2 lines)
+PANEL_W = 170         # width of each side panel (logo + visitor photo)
+FIELD_X = PANEL_W     # playfield starts right of the left panel
 WINDOW_W = PANEL_W * 2 + GRID_W * CELL
 WINDOW_H = HUD_HEIGHT + GRID_H * CELL + FOOTER_HEIGHT
 
-# Farben, die an den ikonischen Bildschirm-Look jeder Maschine erinnern.
+# Colors evoking each machine's iconic screen look.
 PLATFORM_COLORS = {
     "ATARI": (108, 174, 216),   # Atari BASIC light blue
     "C64": (183, 173, 35),      # Commodore 64 gold/gelb
@@ -309,11 +302,11 @@ OPPOSITE = {"U": "D", "D": "U", "L": "R", "R": "L"}
 
 
 def fetch_photo_ftp_blocking(pin: str):
-    """Download <pin>/<HTTP_PHOTO_FILENAME> (dieselbe Ordner+Dateiname-
-    Struktur wie die HTTP-Variante, nur ueber FTP statt HTTP, z.B. Host als
-    IP-Adresse) in den lokalen Cache und gibt den lokalen Pfad zurueck, oder
-    None falls nicht gefunden/keine PIN. Macht blockierendes Netzwerk-I/O -
-    nur ueber run_in_executor aufrufen, nie direkt aus der Event-Loop."""
+    """Downloads <pin>/<HTTP_PHOTO_FILENAME> (same folder+filename structure
+    as the HTTP variant, just over FTP instead of HTTP, e.g. host as an
+    IP address) into the local cache and returns the local path, or
+    None if not found/no PIN. Does blocking network I/O - only call via
+    run_in_executor, never directly from the event loop."""
     pin = (pin or "").strip()
     if not pin or pin.upper() in ("NONE", "-"):
         return None
@@ -344,11 +337,11 @@ def fetch_photo_ftp_blocking(pin: str):
 
 
 def fetch_photo_http_blocking(pin: str):
-    """Laedt <PIN>/<HTTP_PHOTO_FILENAME> von HTTP_PHOTO_BASE_URL in den
-    lokalen Cache und gibt den lokalen Pfad zurueck, oder None falls nicht
-    gefunden/keine PIN. Gleicher blockierender I/O-Vertrag wie
-    fetch_photo_ftp_blocking - nur ueber run_in_executor aufrufen, nie
-    direkt aus der asyncio-Event-Loop."""
+    """Downloads <PIN>/<HTTP_PHOTO_FILENAME> from HTTP_PHOTO_BASE_URL into
+    the local cache and returns the local path, or None if not
+    found/no PIN. Same blocking I/O contract as fetch_photo_ftp_blocking
+    - only call via run_in_executor, never directly from the asyncio
+    event loop."""
     pin = (pin or "").strip()
     if not pin or pin.upper() in ("NONE", "-"):
         return None
@@ -372,18 +365,17 @@ def fetch_photo_http_blocking(pin: str):
 
 
 def fetch_photo_blocking(pin: str):
-    """Dispatcher - ruft je nach PHOTO_SOURCE entweder den FTP- oder den
-    HTTP-Fotoabruf auf, ohne dass sich an der Aufrufstelle etwas aendert.
-    Blockierend - nur ueber run_in_executor aufrufen, nie direkt aus der
-    Event-Loop."""
+    """Dispatcher - calls either the FTP or the HTTP photo fetch depending
+    on PHOTO_SOURCE, with nothing changing at the call site. Blocking -
+    only call via run_in_executor, never directly from the event loop."""
     if PHOTO_SOURCE.upper() == "HTTP":
         return fetch_photo_http_blocking(pin)
     return fetch_photo_ftp_blocking(pin)
 
 
 def logo_path_for(platform: str):
-    """Sucht ein Firmenlogo-Bild fuer eine Plattform in LOGO_DIR. Guenstige
-    lokale Dateisystem-Pruefung - sicher direkt aus der Event-Loop aufrufbar."""
+    """Looks for a company logo image for a platform in LOGO_DIR. Cheap
+    local filesystem check - safe to call directly from the event loop."""
     for base in LOGO_NAME_CANDIDATES.get(platform, []):
         for ext in LOGO_EXTENSIONS:
             p = os.path.join(LOGO_DIR, base + ext)
@@ -393,8 +385,8 @@ def logo_path_for(platform: str):
 
 
 def event_logo_path():
-    """Sucht das Vereinslogo der Veranstaltung ("logo.jpg" o.ae.) im selben
-    Ordner wie die Firmenlogos. Gleiche guenstige lokale Pruefung wie
+    """Looks for the event's club logo ("logo.jpg" or similar) in the same
+    folder as the company logos. Same cheap local check as
     logo_path_for()."""
     for ext in LOGO_EXTENSIONS:
         p = os.path.join(LOGO_DIR, "logo" + ext)
@@ -404,15 +396,15 @@ def event_logo_path():
 
 
 def log(msg: str) -> None:
-    """Wie print(), haengt msg zusaetzlich an LOG_FILE_PATH an (siehe Config
-    oben). Fehler beim Dateizugriff sollen das Spiel nie abbrechen - im
-    Zweifel landet die Meldung dann eben nur auf der Konsole."""
+    """Like print(), additionally appends msg to LOG_FILE_PATH (see config
+    above). File-access errors should never abort the game - worst case
+    the message just ends up on the console only."""
     print(msg)
     try:
         with open(LOG_FILE_PATH, "a", encoding="utf-8") as f:
             f.write(msg + "\n")
     except OSError as e:
-        print(f"[log] konnte nicht nach {LOG_FILE_PATH} schreiben: {e}")
+        print(f"[log] couldn't write to {LOG_FILE_PATH}: {e}")
 
 
 @dataclass
@@ -427,16 +419,16 @@ class Player:
     alive: bool = True
     trail: set = field(default_factory=set)
     pin: str = ""
-    photo_task: object = field(default=None, repr=False)  # asyncio.Future von run_in_executor
+    photo_task: object = field(default=None, repr=False)  # asyncio.Future from run_in_executor
     inbuf: object = field(default_factory=lambda: LineBuffer(), repr=False)
 
 
 class Stats:
-    """Verfolgt die Gesamtzahl gespielter Spiele und Siege pro Retro-Plattform."""
+    """Tracks the total number of games played and wins per retro platform."""
 
     def __init__(self):
         self.games_played = 0
-        self.wins = {}  # plattform -> anzahl siege
+        self.wins = {}  # platform -> win count
         self.draws = 0
 
     def record_win(self, platform: str):
@@ -462,13 +454,13 @@ class Stats:
 
 
 def load_stats_from_csv():
-    """Liest vorhandene Ergebnisse aus RESULTS_CSV_PATH und baut daraus den
-    aktuellen Punktestand wieder auf (ueber die normalen record_win/record_draw
-    Methoden, damit exakt dieselbe Logik wie live verwendet wird). Fehlt die
-    Datei, wird einfach bei 0 gestartet. Fehlerhafte einzelne Zeilen werden
-    uebersprungen statt den Start abzubrechen."""
+    """Reads existing results from RESULTS_CSV_PATH and rebuilds the current
+    score from them (via the normal record_win/record_draw methods, so
+    it's exactly the same logic used live). If the file is missing, it
+    simply starts at 0. Individual malformed rows are skipped instead of
+    aborting startup."""
     if not os.path.exists(RESULTS_CSV_PATH):
-        print(f"[stats] keine {RESULTS_CSV_PATH} gefunden - starte bei 0")
+        print(f"[stats] no {RESULTS_CSV_PATH} found - starting at 0")
         return
     loaded = 0
     skipped = 0
@@ -488,21 +480,21 @@ def load_stats_from_csv():
                 except Exception:
                     skipped += 1
     except Exception as e:
-        print(f"[stats] konnte {RESULTS_CSV_PATH} nicht lesen, starte bei 0: {e}")
+        print(f"[stats] couldn't read {RESULTS_CSV_PATH}, starting at 0: {e}")
         return
-    msg = f"[stats] {loaded} vorherige Spiele aus {RESULTS_CSV_PATH} geladen"
+    msg = f"[stats] loaded {loaded} previous games from {RESULTS_CSV_PATH}"
     if skipped:
-        msg += f" ({skipped} fehlerhafte Zeile(n) uebersprungen)"
+        msg += f" ({skipped} malformed row(s) skipped)"
     print(msg)
     stats.print_console()
 
 
 def append_result_to_csv(p1: "Player", p2: "Player", result: str,
                           winner_platform: str = "", winner_name: str = ""):
-    """Haengt eine Zeile fuer das gerade beendete Spiel an RESULTS_CSV_PATH an
-    (legt die Datei inkl. Kopfzeile an, falls sie noch nicht existiert). Ein
-    Schreibfehler (z.B. Rechte-Problem) wirft den Server nicht um, sondern
-    gibt nur eine Konsolenwarnung aus."""
+    """Appends a line for the just-finished game to RESULTS_CSV_PATH
+    (creates the file including a header row if it doesn't exist yet).
+    A write error (e.g. a permissions problem) doesn't crash the
+    server, it just prints a console warning."""
     try:
         is_new = not os.path.exists(RESULTS_CSV_PATH)
         with open(RESULTS_CSV_PATH, "a", newline="", encoding="utf-8") as f:
@@ -518,7 +510,7 @@ def append_result_to_csv(p1: "Player", p2: "Player", result: str,
                 "winner_name": winner_name,
             })
     except Exception as e:
-        print(f"[stats] konnte Ergebnis nicht in {RESULTS_CSV_PATH} schreiben: {e}")
+        print(f"[stats] couldn't write result to {RESULTS_CSV_PATH}: {e}")
 
 
 stats = Stats()
@@ -527,11 +519,11 @@ waiting_player: Player | None = None
 lock = asyncio.Lock()
 
 # ---------------------------------------------------------------------------
-# Gemeinsam genutzter Render-State. Die asyncio-Seite (Netzwerk-Thread)
-# schreibt hier unter render_lock hinein; die pygame-Seite (Haupt-Thread)
-# liest etwa 30 Mal pro Sekunde unter demselben Lock. Updates guenstig
-# halten - kleine Strukturen hineinkopieren, keine lebenden Referenzen auf
-# veraenderliche Spielobjekte herausgeben.
+# Shared render state. The asyncio side (network thread) writes here
+# under render_lock; the pygame side (main thread) reads roughly 30
+# times a second under the same lock. Keep updates cheap - copy in
+# small structures, never hand out live references to mutable game
+# objects.
 # ---------------------------------------------------------------------------
 render_lock = threading.Lock()
 render_state = {
@@ -574,12 +566,11 @@ def snapshot_render():
 
 
 class LineBuffer:
-    """Sammelt rohe Bytes von einem Socket und entnimmt vollstaendige
-    Zeilen, tolerant gegenueber \\r, \\n oder \\r\\n als Terminator - manche
-    Retro-Netzwerk-Stacks (besonders Commodore/IEC) nutzen traditionell ein
-    einzelnes CR statt LF. Behaelt unvollstaendige Zeilen ueber mehrere
-    Aufrufe hinweg, damit eine ueber zwei Reads verteilte Zeile nie
-    beschaedigt oder verworfen wird."""
+    """Collects raw bytes from a socket and extracts complete lines,
+    tolerant of \\r, \\n or \\r\\n as terminators - some retro network
+    stacks (especially Commodore/IEC) traditionally use a single CR
+    instead of LF. Keeps incomplete lines across multiple calls, so a
+    line split across two reads is never corrupted or dropped."""
 
     def __init__(self):
         self.buf = bytearray()
@@ -592,7 +583,7 @@ class LineBuffer:
             if b in (0x0D, 0x0A):
                 line = bytes(self.buf[:i])
                 rest = self.buf[i + 1:]
-                # Ein gepaartes zweites Terminator-Byte verschlucken (CRLF oder LFCR).
+                # Swallow a paired second terminator byte (CRLF or LFCR).
                 if rest[:1] in (b"\r", b"\n") and rest[:1] != bytes([b]):
                     rest = rest[1:]
                 self.buf = rest
@@ -609,9 +600,8 @@ async def send(writer: asyncio.StreamWriter, line: str):
 
 
 async def read_line(reader: asyncio.StreamReader, timeout: float | None = None):
-    """Einmaliges Zeilen-Lesen (nur fuer den anfaenglichen HELLO-Handshake
-    genutzt) - CR/LF-tolerant ueber einen wegwerfbaren LineBuffer, der
-    haeppchenweise gefuettert wird."""
+    """Reads a single line (only used for the initial HELLO handshake) -
+    CR/LF-tolerant via a disposable LineBuffer, fed in chunks."""
     lb = LineBuffer()
     try:
         while True:
@@ -632,10 +622,10 @@ async def read_line(reader: asyncio.StreamReader, timeout: float | None = None):
 async def pair_and_maybe_start(platform: str, name: str, pin: str,
                                 reader: asyncio.StreamReader, writer: asyncio.StreamWriter,
                                 peer_desc: str = ""):
-    """Gemeinsame Paarungslogik, genutzt sowohl vom TCP-Pfad (ein echter
-    Socket) als auch vom HTTP-Polling-Pfad (ein HTTPPlayerConn-Platzhalter).
-    Registriert entweder als wartender Spieler (sendet WAIT) oder paart mit
-    wer auch immer schon wartet und startet das Spiel als Hintergrund-Task."""
+    """Shared pairing logic, used by both the TCP path (a real socket) and
+    the HTTP-polling path (an HTTPPlayerConn stand-in). Either registers
+    as the waiting player (sends WAIT) or pairs with whoever's already
+    waiting and starts the game as a background task."""
     global waiting_player
 
     print(f"[+] {platform}/{name} connected{(' from ' + peer_desc) if peer_desc else ''}" +
@@ -676,38 +666,36 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
 
 
 # =============================================================================
-# HTTP-POLLING-BRUECKE FUER C64/MEATLOAF UND AMSTRAD CPC/M4
+# HTTP-POLLING BRIDGE FOR C64/MEATLOAF AND AMSTRAD CPC/M4
 # =============================================================================
-# Weder Meatloaf noch das M4-Board koennen aus reinem BASIC heraus
-# zuverlaessig einen dauerhaften rohen TCP-Socket offen halten (M4 kann das
-# aus BASIC heraus ohne handgeschriebenen Z80-Assemblercode schlicht nicht;
-# Meatloaf kann technisch einen oeffnen, aber das hat sich ueber viele
-# Runden echter Hardware-Tests als unzuverlaessig erwiesen). Beide koennen
-# aber aus BASIC heraus einfache HTTP-GET-Anfragen stellen, daher fragen
-# beide Clients stattdessen kleine HTTP-Anfragen ab, statt eine Verbindung
-# offen zu halten: einmal /join, dann wiederholt /tick (schickt eine
-# etwaige Richtungsaenderung, bekommt zurueck was ansteht - WAIT, START,
-# oder irgendwann END + STATS). Alles Folgende passt dieses Anfrage-/
-# Antwort-Polling einfach in dieselbe Player-/run_game-Maschinerie ein, die
-# auch der TCP-Client (Atari) nutzt, ueber einen duck-typed Platzhalter fuer
-# (StreamReader, StreamWriter).
+# Neither Meatloaf nor the M4 board can reliably keep a persistent raw
+# TCP socket open from plain BASIC (M4 simply can't from BASIC without
+# hand-written Z80 assembly; Meatloaf can technically open one, but
+# that's proven unreliable over many rounds of real hardware testing).
+# Both can, however, make simple HTTP GET requests from BASIC, so both
+# clients poll small HTTP requests instead of keeping a connection
+# open: once /join, then repeatedly /tick (sends any direction change,
+# gets back whatever's pending - WAIT, START, or eventually END +
+# STATS). Everything below just fits this request/response polling
+# into the same Player/run_game machinery the TCP client (Atari) uses,
+# via a duck-typed stand-in for (StreamReader, StreamWriter).
 # =============================================================================
 http_sessions: dict = {}
-# Merkt sich Zeitpunkt (time.monotonic()) des Ablaufs kuerzlich entfernter
-# Sessions - reine Diagnose-Hilfe fuer "gesuchte session NICHT gefunden":
-# unterscheidet "session ist wirklich abgelaufen" von "hat nie existiert"
-# (z.B. wegen einer verstuemmelten Join-Antwort clientseitig).
+# Remembers the expiry time (time.monotonic()) of recently removed
+# sessions - a pure diagnostic aid for "session not found": tells apart
+# "session genuinely expired" from "never existed" (e.g. because of a
+# mangled join response on the client side).
 recently_expired_sessions: dict = {}
 
 
 class HTTPPlayerConn:
-    """Steht stellvertretend fuer ein (StreamReader, StreamWriter)-Paar bei
-    einem HTTP-abgefragten Spieler. Zeilen, die AN diese "Verbindung"
-    gesendet werden (ueber send()/writer.write()), sammeln sich in einer
-    Outbox, die der naechste /tick-Abruf entnimmt und zurueckgibt. Zeilen,
-    die VOM Spieler ankommen (MOVE-Befehle aus /tick-Anfragen), werden in
-    eine asyncio.Queue gelegt, aus der readline() liest - so funktioniert
-    run_game()s bestehendes 10ms-Timeout-Lesemuster unveraendert auch hier."""
+    """Stands in for a (StreamReader, StreamWriter) pair for an
+    HTTP-polled player. Lines sent TO this "connection" (via
+    send()/writer.write()) collect in an outbox that the next /tick
+    poll drains and returns. Lines arriving FROM the player (MOVE
+    commands from /tick requests) go into an asyncio.Queue that
+    readline() reads from - so run_game()'s existing 10ms-timeout read
+    pattern works unchanged here too."""
 
     def __init__(self, session_id: str = ""):
         self._inbox = asyncio.Queue()
@@ -716,17 +704,16 @@ class HTTPPlayerConn:
         self.session_id = session_id
         self.platform = ""
         self.name = ""
-        self.last_tick_at = None  # monotonic() beim letzten /tick, fuers
-        # tick-latency-logging in http_handle_request() weiter unten
+        self.last_tick_at = None  # monotonic() at the last /tick, for the
+        # tick-latency logging in http_handle_request() below
 
     async def readline(self):
         return await self._inbox.get()
 
     async def read(self, n=256):
-        # n wird ignoriert - abgelegte elemente sind immer klein, vorgefertigte
-        # "zeile\n"-byte-happen von feed_line() - gleicher vertrag wie ein
-        # echter sockets read(), das "was auch immer gerade verfuegbar ist"
-        # zurueckgibt.
+        # n is ignored - queued elements are always small, ready-made
+        # "line\n" byte chunks from feed_line() - same contract as a real
+        # socket's read(), which returns "whatever's currently available".
         return await self._inbox.get()
 
     def at_eof(self):
@@ -743,17 +730,16 @@ class HTTPPlayerConn:
 
     def close(self):
         self.closed = True
-        # Anders als bei einem echten TCP-Socket-Close ist eine HTTP-
-        # "Verbindung" nur dieses Objekt, das in http_sessions liegt. Wuerden
-        # wir es sofort entfernen, kaeme der eine /tick-Abruf, der das
-        # finale END+STATS abholen soll, fast immer zu spaet - ein voller
-        # HTTP-Roundtrip (oeffnen, lesen, schlieszen) braucht echte
-        # Wanduhr-Zeit, waehrend das Befuellen der Outbox und das Loeschen
-        # der Session hier unmittelbar hintereinander ohne nennenswerte
-        # Luecke passieren. Stattdessen also: Session fuer eine Gnadenfrist
-        # am Leben halten, damit der Client genug Chancen hat, abzufragen
-        # und die finale Nachricht tatsaechlich zu erhalten, und erst danach
-        # aufraeumen.
+        # Unlike a real TCP socket close, an HTTP "connection" is just
+        # this object sitting in http_sessions. If we removed it right
+        # away, the one /tick poll meant to pick up the final END+STATS
+        # would almost always arrive too late - a full HTTP round trip
+        # (open, read, close) takes real wall-clock time, while filling
+        # the outbox and deleting the session here happen back to back
+        # with no meaningful gap. So instead: keep the session alive for
+        # a grace period, so the client has enough chances to poll and
+        # actually receive the final message, and only clean up after
+        # that.
         if self.session_id:
             loop = asyncio.get_running_loop()
             loop.call_later(15, self._expire)
@@ -776,12 +762,12 @@ HTTP_DIR_MAP = {"U": "MOVE U", "D": "MOVE D", "L": "MOVE L", "R": "MOVE R"}
 
 
 async def http_handle_request(path: str) -> str:
-    """Leitet einen geparsten HTTP-GET-Pfad an die join-/tick-Logik weiter
-    und gibt den zurueckzusendenden Klartext-Body zurueck. path hat keinen
-    fuehrenden '?'-Query-String - alles sind Pfad-Segmente (wie die
-    Geraete-Firmware '?'/'&' in |HTTPGET-Anfragen behandelt, ist nicht
-    dokumentiert/bestaetigt, daher wird das hier bewusst vermieden):
-    /join/<plattform>/<name>/<pin-oder-NONE> und /tick/<session>/<richtung-oder-N>"""
+    """Routes a parsed HTTP GET path to the join/tick logic and returns the
+    plain-text body to send back. path has no leading '?' query string -
+    everything is path segments (how the device firmware handles '?'/'&'
+    in |HTTPGET requests isn't documented/confirmed, so this deliberately
+    avoids it): /join/<platform>/<name>/<pin-or-NONE> and
+    /tick/<session>/<direction-or-N>"""
     segments = [s for s in path.strip("/").split("/") if s != ""]
 
     if not segments:
@@ -797,27 +783,27 @@ async def http_handle_request(path: str) -> str:
         conn.platform = platform
         conn.name = name
         http_sessions[session_id] = conn
-        print(f"[http] JOIN: neue session gespeichert: {session_id!r}  (aktuelle keys: {list(http_sessions.keys())!r})")
+        print(f"[http] JOIN: new session stored: {session_id!r}  (current keys: {list(http_sessions.keys())!r})")
 
         asyncio.create_task(pair_and_maybe_start(platform, name, pin, conn, conn, peer_desc="HTTP"))
-        # Dem Pairing einen kurzen Moment geben, damit ein Match im selben
-        # Augenblick sofort START zurueckgibt, statt einen weiteren
-        # Roundtrip zu erzwingen.
+        # Give the pairing a brief moment, so a match at the exact same
+        # instant returns START right away instead of forcing another
+        # round trip.
         await asyncio.sleep(0.05)
         return f"SESSION {session_id}\n" + conn.pop_outbox()
 
     if segments[0] == "tick" and len(segments) >= 2:
-        session_id = segments[1].upper()  # meatloaf scheint beim GET# irgendwo
-        # zwischen ascii/petscii hin- und herzuwandeln, wobei die gross-/klein-
-        # schreibung durcheinanderkommt - deshalb hier bewusst tolerant sein
+        session_id = segments[1].upper()  # meatloaf appears to convert
+        # between ascii/petscii somewhere during GET#, scrambling the
+        # case - so be deliberately tolerant about it here
         direction = segments[2].upper() if len(segments) > 2 else "N"
         conn = http_sessions.get(session_id)
         if conn is None:
             expired_ago = recently_expired_sessions.get(session_id)
-            reason = (f"vor {time.monotonic() - expired_ago:.1f}s abgelaufen"
-                      if expired_ago is not None else "hat hier nie existiert")
-            print(f"[http] TICK: gesuchte session {session_id!r} NICHT gefunden "
-                  f"({reason}). aktuelle keys: {list(http_sessions.keys())!r}")
+            reason = (f"expired {time.monotonic() - expired_ago:.1f}s ago"
+                      if expired_ago is not None else "never existed here")
+            print(f"[http] TICK: requested session {session_id!r} NOT found "
+                  f"({reason}). current keys: {list(http_sessions.keys())!r}")
             return "ERR UNKNOWN SESSION"
         now = time.monotonic()
         if conn.last_tick_at is not None:
@@ -837,7 +823,7 @@ async def handle_http_connection(reader: asyncio.StreamReader, writer: asyncio.S
         if not request_line:
             writer.close()
             return
-        # Restliche Anfrage-Header einlesen und verwerfen.
+        # Read and discard the remaining request headers.
         while True:
             line = await asyncio.wait_for(reader.readline(), timeout=2)
             if not line or line in (b"\r\n", b"\n"):
@@ -846,7 +832,7 @@ async def handle_http_connection(reader: asyncio.StreamReader, writer: asyncio.S
         try:
             method, raw_path, _ = request_line.decode("ascii", errors="ignore").split()
         except ValueError:
-            print(f"[http] konnte request line nicht parsen: {request_line!r}")
+            print(f"[http] couldn't parse request line: {request_line!r}")
             writer.close()
             return
 
@@ -873,10 +859,10 @@ async def handle_http_connection(reader: asyncio.StreamReader, writer: asyncio.S
 
 
 async def drain_moves(players):
-    """Non-blockierend anstehende MOVE/BYE-Kommandos fuer jeden Spieler
-    einlesen und anwenden. Wird sowohl waehrend des Countdowns (damit
-    Richtungswechsel nicht verloren gehen) als auch im normalen Spiel-Tick
-    verwendet, damit beide Stellen exakt gleich funktionieren."""
+    """Non-blockingly reads and applies any pending MOVE/BYE commands for
+    each player. Used both during the countdown (so direction changes
+    aren't lost) and in the normal game tick, so both spots behave
+    exactly the same."""
     for p in players:
         try:
             data = await asyncio.wait_for(p.reader.read(256), timeout=0.01)
@@ -900,13 +886,13 @@ async def drain_moves(players):
                 if len(tokens) > 1 and tokens[1] in DIRS:
                     d = tokens[1]
                     if d == OPPOSITE.get(p.direction):
-                        log(f"[move] {p.platform}/{p.name}: {d} ignoriert (Kehrtwende von {p.direction})")
+                        log(f"[move] {p.platform}/{p.name}: {d} ignored (reverse of {p.direction})")
                     elif d != p.direction:
                         log(f"[move] {p.platform}/{p.name}: {p.direction} -> {d}")
                         p.direction = d
-                    # sonst: client sendet dieselbe richtung erneut (z.b. bei
-                    # http-polling-clients normal) - nicht loggen, sonst flutet
-                    # das die datei ohne neue information.
+                    # else: client is resending the same direction (normal for
+                    # HTTP-polling clients, e.g.) - don't log it, or it'd flood
+                    # the file with no new information.
             elif line == "BYE":
                 p.alive = False
 
@@ -947,16 +933,16 @@ async def run_game(p1: Player, p2: Player):
 
     players = [p1, p2]
 
-    # --- Countdown: 3, 2, 1, dann der abschliessende Spruch (siehe unten) -
-    # Richtungswechsel werden schon eingelesen (damit nichts verloren geht),
-    # aber niemand bewegt sich. ---
+    # --- Countdown: 3, 2, 1, then the closing line (see below) - direction
+    # changes are already read in (so nothing gets lost), but nobody
+    # actually moves. ---
     for count in (3, 2, 1):
         update_render(countdown=str(count))
         deadline = time.monotonic() + 1.0
         while time.monotonic() < deadline:
             await drain_moves(players)
             if not (p1.alive and p2.alive):
-                break  # jemand hat BYE geschickt, waehrend gewartet wurde
+                break  # someone sent BYE while waiting
             await asyncio.sleep(0.05)
 
     update_render(countdown="Go, get in there! Move!")
@@ -1028,7 +1014,7 @@ async def run_game(p1: Player, p2: Player):
         except Exception:
             pass
 
-    await asyncio.sleep(4)  # ergebnis noch ein paar sekunden auf dem bildschirm stehen lassen
+    await asyncio.sleep(4)  # leave the result on screen for a few more seconds
     update_render(phase="waiting", status="Waiting for lightcycles to connect...",
                   trail1=set(), trail2=set(), pos1=None, pos2=None,
                   photo1=None, photo2=None, logo1=None, logo2=None)
@@ -1071,11 +1057,11 @@ def pygame_loop():
     font_tiny = pygame.font.SysFont("couriernew,monospace", 14)
     tron_font_found = bool(SCROLL_FONT_PATH and os.path.exists(SCROLL_FONT_PATH))
     if not tron_font_found and SCROLL_FONT_PATH:
-        print(f"[display] Scroll-Font nicht gefunden: {SCROLL_FONT_PATH} - nutze Standardschrift")
+        print(f"[display] Scroll font not found: {SCROLL_FONT_PATH} - using default font")
 
     def load_tron_font(size):
-        """Selbe Font-Datei wie der Demo-Scroller (SCROLL_FONT_PATH), nur in
-        einer anderen Groesse - mit demselben Standardschrift-Fallback."""
+        """Same font file as the demo scroller (SCROLL_FONT_PATH), just at a
+        different size - with the same default-font fallback."""
         if tron_font_found:
             return pygame.font.Font(SCROLL_FONT_PATH, size)
         return pygame.font.SysFont("couriernew,monospace", size, bold=True)
@@ -1087,27 +1073,27 @@ def pygame_loop():
     tribute_caption_font = load_tron_font(24)
     tribute_url_font = load_tron_font(16)
 
-    # Demo-Scroller Zustand: laeuft nur weiter/wird nur gezeichnet, solange
-    # die Server-Phase "waiting" ist (siehe Hauptschleife weiter unten).
+    # Demo-scroller state: only advances/gets drawn while the server phase
+    # is "waiting" (see the main loop further below).
     scroll_char_widths = [scroll_font.size(c)[0] for c in SCROLL_TEXT]
     scroll_total_width = sum(scroll_char_widths)
     scroll_x = WINDOW_W
     scroll_wave_phase = 0.0
     scroll_hue = 0.0
 
-    # Wartebildschirm wechselt sich ab, solange auf spieler gewartet wird:
-    # scrolltext (SCROLL_LOOPS_BEFORE_HIGHSCORE volle durchlaeufe) -> high-
-    # score-liste (HIGHSCORE_DURATION sekunden) -> tribute-bildschirm
-    # (TRIBUTE_DURATION sekunden) -> fotofix-dank (GREETING_DURATION sekunden)
-    # -> wieder scrolltext, usw. (siehe config oben).
+    # The waiting screen cycles through, for as long as the server is
+    # waiting for players: scroll text (SCROLL_LOOPS_BEFORE_HIGHSCORE full
+    # loops) -> high-score list (HIGHSCORE_DURATION seconds) -> tribute
+    # screen (TRIBUTE_DURATION seconds) -> fotofix thanks (GREETING_DURATION
+    # seconds) -> back to scroll text, etc. (see config above).
     waiting_mode = "scroll"
     scroll_loop_count = 0
     highscore_shown_until = 0.0
     tribute_shown_until = 0.0
     greeting_shown_until = 0.0
 
-    # Geladene+skalierte Bilder nach (pfad, max_b, max_h) cachen, damit wir
-    # nicht bei jedem einzelnen Frame dasselbe JPEG/PNG neu dekodieren.
+    # Cache loaded+scaled images by (path, max_w, max_h), so we don't
+    # re-decode the same JPEG/PNG on every single frame.
     image_cache = {}
 
     def load_scaled(path, max_w, max_h):
@@ -1129,18 +1115,17 @@ def pygame_loop():
         image_cache[key] = scaled
         return scaled
 
-    # Vereinslogo: einmalig direkt nach dem Start geladen, bleibt danach
-    # das ganze Programm ueber im Speicher und wird in JEDER Phase gezeigt
-    # (Warten, Countdown, Spiel, Ergebnis) - nicht bei jedem Frame neu vom
-    # Dateisystem geprueft.
+    # Club logo: loaded once right after startup, stays in memory for the
+    # rest of the program and is shown in EVERY phase (waiting, countdown,
+    # game, result) - not re-checked against the filesystem every frame.
     event_logo_surf = load_scaled(event_logo_path(), PANEL_W - 20, 70)
     if event_logo_surf is None:
-        print(f"[display] Vereinslogo nicht gefunden (erwartet: logo.jpg/.png/... in {LOGO_DIR})")
+        print(f"[display] club logo not found (expected: logo.jpg/.png/... in {LOGO_DIR})")
         try:
             actual_files = os.listdir(LOGO_DIR)
-            print(f"[display] tatsaechlich vorhanden in {LOGO_DIR}: {actual_files}")
+            print(f"[display] actually present in {LOGO_DIR}: {actual_files}")
         except Exception as e:
-            print(f"[display] konnte {LOGO_DIR} nicht auflisten: {e}")
+            print(f"[display] couldn't list {LOGO_DIR}: {e}")
 
     def draw_panel(x0, name, plat, photo_path, logo_path):
         color = color_for(plat)
@@ -1176,9 +1161,9 @@ def pygame_loop():
             screen.blit(label2, label2.get_rect(centerx=x0 + PANEL_W // 2, top=y))
 
     def draw_highscore(wins, draws, games_played):
-        """Klassische Highscore-Liste, plattform mit den meisten siegen
-        zuerst - eine der beiden abwechselnden Wartebildschirm-Ansichten,
-        siehe waiting_mode in der Hauptschleife."""
+        """Classic high-score list, platform with the most wins first - one
+        of the alternating waiting-screen views, see waiting_mode in the
+        main loop."""
         cx = FIELD_X + (GRID_W * CELL) // 2
         top = HUD_HEIGHT + 40
 
@@ -1205,8 +1190,8 @@ def pygame_loop():
         screen.blit(footer, footer.get_rect(centerx=cx, top=y))
 
     def wrap_text(text, font, max_width):
-        """Zerlegt text in zeilen, die jeweils in max_width passen (wortweise
-        umgebrochen) - fuer credit-texte unbekannter/wechselnder Laenge in
+        """Splits text into lines that each fit within max_width (wrapped by
+        word) - for credit texts of unknown/varying length in
         draw_tribute()."""
         words = text.split(" ")
         lines = []
@@ -1223,9 +1208,9 @@ def pygame_loop():
         return lines
 
     def draw_tribute():
-        """Wuerdigt die Projekte hinter den WiFi-Interfaces (TRIBUTE_ENTRIES
-        oben in der config) - dritte abwechselnde Wartebildschirm-Ansicht,
-        siehe waiting_mode in der Hauptschleife."""
+        """Credits the projects behind the WiFi interfaces (TRIBUTE_ENTRIES
+        in the config above) - third alternating waiting-screen view, see
+        waiting_mode in the main loop."""
         cx = FIELD_X + (GRID_W * CELL) // 2
         top = HUD_HEIGHT + 30
 
@@ -1259,9 +1244,9 @@ def pygame_loop():
             screen.blit(url_surf, url_surf.get_rect(centerx=col_cx, top=y))
 
     def draw_greeting():
-        """Einzelnes dankeschoen (GREETING_IMAGE/GREETING_TEXT oben in der
-        config) - vierte abwechselnde Wartebildschirm-Ansicht, siehe
-        waiting_mode in der Hauptschleife."""
+        """A single thank-you (GREETING_IMAGE/GREETING_TEXT in the config
+        above) - fourth alternating waiting-screen view, see waiting_mode
+        in the main loop."""
         cx = FIELD_X + (GRID_W * CELL) // 2
         y = HUD_HEIGHT + 40
 
@@ -1288,7 +1273,7 @@ def pygame_loop():
 
         screen.fill(HUD_BG_COLOR)
 
-        # --- HUD (kopfzeile mit titel, status, punktestand) ---
+        # --- HUD (header with title, status, score) ---
         title = font_big.render("Classic Computing 2026:RETRO TRON BATTLE", True, TEXT_COLOR)
         screen.blit(title, (16, 10))
 
@@ -1314,19 +1299,19 @@ def pygame_loop():
             True, DIM_TEXT_COLOR)
         screen.blit(stats_line, (16, 96))
 
-        # --- Vereinslogo oben rechts, einmalig geladen (siehe oben),
-        # in jeder Phase permanent sichtbar ---
+        # --- Club logo top right, loaded once (see above), permanently
+        # visible in every phase ---
         if event_logo_surf:
             rect = event_logo_surf.get_rect(right=WINDOW_W - 16, top=10)
             screen.blit(event_logo_surf, rect)
 
-        # --- Seitenpanels (logo + besucherfoto) ---
+        # --- Side panels (logo + visitor photo) ---
         if state["phase"] in ("countdown", "playing", "ended"):
             draw_panel(0, state["p1_name"], state["p1_plat"], state["photo1"], state["logo1"])
             draw_panel(FIELD_X + GRID_W * CELL, state["p2_name"], state["p2_plat"],
                        state["photo2"], state["logo2"])
 
-        # --- Spielfeld ---
+        # --- Playfield ---
         field_rect = pygame.Rect(FIELD_X, HUD_HEIGHT, GRID_W * CELL, GRID_H * CELL)
         pygame.draw.rect(screen, BG_COLOR, field_rect)
         for gx in range(GRID_W + 1):
@@ -1336,9 +1321,8 @@ def pygame_loop():
             y = HUD_HEIGHT + gy * CELL
             pygame.draw.line(screen, GRID_LINE_COLOR, (FIELD_X, y), (FIELD_X + GRID_W * CELL, y))
 
-        # --- Wartebildschirm: scrolltext, highscore-liste und tribute-
-        # bildschirm wechseln sich ab, laeuft nur, solange auf spieler
-        # gewartet wird ---
+        # --- Waiting screen: scroll text, high-score list and tribute
+        # screen alternate, only runs while waiting for players ---
         if state["phase"] == "waiting":
             if waiting_mode == "highscore":
                 draw_highscore(state["wins"], state["draws"], state["games_played"])
@@ -1411,8 +1395,8 @@ def pygame_loop():
             pygame.draw.rect(screen, (255, 220, 80), pad, 2)
             screen.blit(big, bg_rect)
 
-        # --- Footer: KI-Hinweis + Credits, permanent sichtbar unter dem
-        # Spielfeld, zwei zeilen (siehe FOOTER_HEIGHT) ---
+        # --- Footer: AI notice + credits, permanently visible below the
+        # playfield, two lines (see FOOTER_HEIGHT) ---
         footer_y = HUD_HEIGHT + GRID_H * CELL
         pygame.draw.rect(screen, HUD_BG_COLOR, (0, footer_y, WINDOW_W, FOOTER_HEIGHT))
         row_h = FOOTER_HEIGHT // 2
@@ -1420,7 +1404,7 @@ def pygame_loop():
         row2_y = footer_y + row_h + row_h // 2
 
         footer_text = font_tiny.render(
-            "Dieses Spiel wurde mit AI-Unterstuetzung generiert.",
+            "This game was generated with AI assistance.",
             True, DIM_TEXT_COLOR)
         screen.blit(footer_text, footer_text.get_rect(center=(WINDOW_W // 2, row1_y)))
         version_text = font_tiny.render(f"build {SERVER_BUILD}", True, DIM_TEXT_COLOR)
@@ -1442,7 +1426,7 @@ def pygame_loop():
 def main(host: str, port: int, http_port: int):
     t = threading.Thread(target=network_thread, args=(host, port, http_port), daemon=True)
     t.start()
-    pygame_loop()  # blockiert im Haupt-Thread, bis das Fenster geschlossen wird
+    pygame_loop()  # blocks on the main thread until the window is closed
 
 
 if __name__ == "__main__":
