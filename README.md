@@ -40,6 +40,8 @@ clients/    BASIC-Clients pro Plattform
               tron_c64_client.bas       (Meatloaf, HTTP-Polling, stabil)
               tron_c64_wic64_client.bas (WiC64, experimentell)
   cpc/      Schneider/Amstrad CPC + M4-Board (HTTP-Polling)
+  apple2/   Apple II + FujiNet (rohes TCP) - experimentell, unverifiziert,
+            siehe CLAUDE.md
 bots/       Automatisierte Test-Bots (Bash/PowerShell) zum Spielen ohne
             echte Hardware, z.B. für Demos oder Lasttests
 tools/      Diagnose-/Testprogramme für einzelne Plattformen, plus

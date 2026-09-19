@@ -149,15 +149,22 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # =============================================================================
 # DEMO-SCROLLTEXT - LAEUFT DURCHS SPIELFELD, SOLANGE AUF SPIELER GEWARTET WIRD
 # =============================================================================
-SCROLL_TEXT = (" RETRO TRON BATTLE - RTB on the CLASSIC COMPUTING 2026 *** PLAY TOGETHER TRON ON OLD HOMECOMPUTERS *** EVERY MATCH COUNTS!") # <-- EDIT: EIGENER TEXT
+SCROLL_TEXT = (" RETRO TRON BATTLE - RTB ON THE CC 2026 AT CELLE ") # <-- EDIT: EIGENER TEXT
 SCROLL_FONT_PATH = os.path.join(BASE_DIR, "assets/font/Flynn-4v54.ttf")  # <-- EDIT: pfad zu einer eigenen .ttf-datei,
                                      # oder "" leer lassen fuer die standard-schrift
-SCROLL_SPEED = 2            # pixel pro frame (bei ~30fps)
+SCROLL_SPEED = 8           # pixel pro frame (bei ~30fps)
 SCROLL_FONT_SIZE = 180       # schriftgroesse in pixel - 64=doppelt, 96=dreifach
 SCROLL_WAVE_AMPLITUDE = 120  # pixel, hoehe der sinuswelle
 SCROLL_WAVE_FREQ = 0.10      # radiant pro zeichen, "enge" der welle
 SCROLL_WAVE_SPEED = 0.12     # radiant pro frame, geschwindigkeit der welle
 SCROLL_COLOR_SPEED = 0.02    # farbverlauf pro frame (regenbogen)
+# =============================================================================
+
+# =============================================================================
+# HIGHSCORE-ANZEIGE - WECHSELT SICH MIT DEM SCROLLTEXT AB, SOLANGE GEWARTET WIRD
+# =============================================================================
+SCROLL_LOOPS_BEFORE_HIGHSCORE = 2  # nach so vielen vollen durchlaeufen kommt die highscore-liste
+HIGHSCORE_DURATION = 20            # sekunden, die die liste steht, bevor der scroller weiterlaeuft
 # =============================================================================
 
 # =============================================================================
@@ -232,6 +239,7 @@ LOGO_NAME_CANDIDATES = {
     "ATARI": ["atari"],
     "C64": ["commodore", "c64"],
     "CPC": ["schneider", "cpc", "amstrad"],
+    "APPLE2": ["apple2", "apple"],
 }
 LOGO_EXTENSIONS = [".png", ".PNG", ".jpg", ".JPG", ".jpeg", ".JPEG", ".gif", ".GIF", ".bmp", ".BMP"]
 # =============================================================================
@@ -242,7 +250,7 @@ TICK_RATE = 8  # ticks/sek - bescheiden halten, das sind langsame clients auf ec
 
 CELL = 18             # pixelgroesse einer gitterzelle im anzeigefenster
 HUD_HEIGHT = 120      # pixelhoehe des stats/status-headers
-FOOTER_HEIGHT = 28    # pixelhoehe des footers (KI-hinweis)
+FOOTER_HEIGHT = 44    # pixelhoehe des footers (KI-hinweis + credits, 2 zeilen)
 PANEL_W = 170         # breite jedes seitenpanels (logo + besucherfoto)
 FIELD_X = PANEL_W     # spielfeld beginnt rechts vom linken panel
 WINDOW_W = PANEL_W * 2 + GRID_W * CELL
@@ -253,6 +261,7 @@ PLATFORM_COLORS = {
     "ATARI": (108, 174, 216),   # Atari BASIC light blue
     "C64": (183, 173, 35),      # Commodore 64 gold/gelb
     "CPC": (70, 200, 110),      # Schneider/Amstrad CPC green phosphor
+    "APPLE2": (220, 110, 60),   # Apple II - amber monochrome monitor
 }
 DEFAULT_COLOR = (200, 200, 200)
 BG_COLOR = (10, 10, 18)
@@ -1020,12 +1029,20 @@ def pygame_loop():
     font_mid = pygame.font.SysFont("couriernew,monospace", 20, bold=True)
     font_small = pygame.font.SysFont("couriernew,monospace", 16)
     font_tiny = pygame.font.SysFont("couriernew,monospace", 14)
-    if SCROLL_FONT_PATH and os.path.exists(SCROLL_FONT_PATH):
-        scroll_font = pygame.font.Font(SCROLL_FONT_PATH, SCROLL_FONT_SIZE)
-    else:
-        if SCROLL_FONT_PATH:
-            print(f"[display] Scroll-Font nicht gefunden: {SCROLL_FONT_PATH} - nutze Standardschrift")
-        scroll_font = pygame.font.SysFont("couriernew,monospace", SCROLL_FONT_SIZE, bold=True)
+    tron_font_found = bool(SCROLL_FONT_PATH and os.path.exists(SCROLL_FONT_PATH))
+    if not tron_font_found and SCROLL_FONT_PATH:
+        print(f"[display] Scroll-Font nicht gefunden: {SCROLL_FONT_PATH} - nutze Standardschrift")
+
+    def load_tron_font(size):
+        """Selbe Font-Datei wie der Demo-Scroller (SCROLL_FONT_PATH), nur in
+        einer anderen Groesse - mit demselben Standardschrift-Fallback."""
+        if tron_font_found:
+            return pygame.font.Font(SCROLL_FONT_PATH, size)
+        return pygame.font.SysFont("couriernew,monospace", size, bold=True)
+
+    scroll_font = load_tron_font(SCROLL_FONT_SIZE)
+    highscore_title_font = load_tron_font(84)
+    highscore_row_font = load_tron_font(42)
 
     # Demo-Scroller Zustand: laeuft nur weiter/wird nur gezeichnet, solange
     # die Server-Phase "waiting" ist (siehe Hauptschleife weiter unten).
@@ -1034,6 +1051,15 @@ def pygame_loop():
     scroll_x = WINDOW_W
     scroll_wave_phase = 0.0
     scroll_hue = 0.0
+
+    # Wartebildschirm wechselt sich zwischen scrolltext und highscore-liste
+    # ab: nach SCROLL_LOOPS_BEFORE_HIGHSCORE vollen durchlaeufen des scrollers
+    # kommt die liste fuer HIGHSCORE_DURATION sekunden, danach geht's mit
+    # dem scroller weiter (siehe SCROLL_LOOPS_BEFORE_HIGHSCORE/HIGHSCORE_DURATION
+    # oben in der config).
+    waiting_mode = "scroll"
+    scroll_loop_count = 0
+    highscore_shown_until = 0.0
 
     # Geladene+skalierte Bilder nach (pfad, max_b, max_h) cachen, damit wir
     # nicht bei jedem einzelnen Frame dasselbe JPEG/PNG neu dekodieren.
@@ -1104,6 +1130,35 @@ def pygame_loop():
             label2 = font_small.render(name[:16], True, TEXT_COLOR)
             screen.blit(label2, label2.get_rect(centerx=x0 + PANEL_W // 2, top=y))
 
+    def draw_highscore(wins, draws, games_played):
+        """Klassische Highscore-Liste, plattform mit den meisten siegen
+        zuerst - eine der beiden abwechselnden Wartebildschirm-Ansichten,
+        siehe waiting_mode in der Hauptschleife."""
+        cx = FIELD_X + (GRID_W * CELL) // 2
+        top = HUD_HEIGHT + 40
+
+        title = highscore_title_font.render("HIGH SCORES", True, (255, 220, 80))
+        screen.blit(title, title.get_rect(centerx=cx, top=top))
+        y = top + title.get_height() + 30
+
+        ranked = sorted(wins.items(), key=lambda kv: -kv[1])
+        if not ranked:
+            line = highscore_row_font.render("NO GAMES PLAYED YET", True, DIM_TEXT_COLOR)
+            screen.blit(line, line.get_rect(centerx=cx, top=y))
+            y += line.get_height() + 10
+        else:
+            for rank, (plat, count) in enumerate(ranked, start=1):
+                color = color_for(plat)
+                text = f"{rank}.  {plat}   {count} WIN{'S' if count != 1 else ''}"
+                line = highscore_row_font.render(text, True, color)
+                screen.blit(line, line.get_rect(centerx=cx, top=y))
+                y += line.get_height() + 14
+
+        y += 20
+        footer = font_small.render(
+            f"Games played: {games_played}   Draws: {draws}", True, DIM_TEXT_COLOR)
+        screen.blit(footer, footer.get_rect(centerx=cx, top=y))
+
     running = True
     while running:
         for event in pygame.event.get():
@@ -1162,26 +1217,37 @@ def pygame_loop():
             y = HUD_HEIGHT + gy * CELL
             pygame.draw.line(screen, GRID_LINE_COLOR, (FIELD_X, y), (FIELD_X + GRID_W * CELL, y))
 
-        # --- Demo-Scroller: laeuft nur, solange auf spieler gewartet wird ---
+        # --- Wartebildschirm: scrolltext und highscore-liste wechseln sich ab,
+        # laeuft nur, solange auf spieler gewartet wird ---
         if state["phase"] == "waiting":
-            scroll_x -= SCROLL_SPEED
-            scroll_wave_phase += SCROLL_WAVE_SPEED
-            scroll_hue = (scroll_hue + SCROLL_COLOR_SPEED) % 1.0
-            if scroll_x < -scroll_total_width:
-                scroll_x = WINDOW_W
+            if waiting_mode == "highscore":
+                draw_highscore(state["wins"], state["draws"], state["games_played"])
+                if time.monotonic() >= highscore_shown_until:
+                    waiting_mode = "scroll"
+            else:
+                scroll_x -= SCROLL_SPEED
+                scroll_wave_phase += SCROLL_WAVE_SPEED
+                scroll_hue = (scroll_hue + SCROLL_COLOR_SPEED) % 1.0
+                if scroll_x < -scroll_total_width:
+                    scroll_x = WINDOW_W
+                    scroll_loop_count += 1
+                    if scroll_loop_count >= SCROLL_LOOPS_BEFORE_HIGHSCORE:
+                        scroll_loop_count = 0
+                        waiting_mode = "highscore"
+                        highscore_shown_until = time.monotonic() + HIGHSCORE_DURATION
 
-            baseline = HUD_HEIGHT + (GRID_H * CELL) // 2
-            cx = scroll_x
-            for i, ch in enumerate(SCROLL_TEXT):
-                cw = scroll_char_widths[i]
-                if -cw <= cx <= WINDOW_W:
-                    hue = (scroll_hue + i * 0.02) % 1.0
-                    rr, gg, bb = colorsys.hsv_to_rgb(hue, 0.85, 1.0)
-                    color = (int(rr * 255), int(gg * 255), int(bb * 255))
-                    y_off = math.sin(scroll_wave_phase + i * SCROLL_WAVE_FREQ) * SCROLL_WAVE_AMPLITUDE
-                    ch_surf = scroll_font.render(ch, True, color)
-                    screen.blit(ch_surf, (cx, baseline + y_off))
-                cx += cw
+                baseline = HUD_HEIGHT + (GRID_H * CELL) // 2
+                cx = scroll_x
+                for i, ch in enumerate(SCROLL_TEXT):
+                    cw = scroll_char_widths[i]
+                    if -cw <= cx <= WINDOW_W:
+                        hue = (scroll_hue + i * 0.02) % 1.0
+                        rr, gg, bb = colorsys.hsv_to_rgb(hue, 0.85, 1.0)
+                        color = (int(rr * 255), int(gg * 255), int(bb * 255))
+                        y_off = math.sin(scroll_wave_phase + i * SCROLL_WAVE_FREQ) * SCROLL_WAVE_AMPLITUDE
+                        ch_surf = scroll_font.render(ch, True, color)
+                        screen.blit(ch_surf, (cx, baseline + y_off))
+                    cx += cw
 
         def draw_trail(cells, plat, head):
             color = color_for(plat)
@@ -1215,15 +1281,26 @@ def pygame_loop():
             pygame.draw.rect(screen, (255, 220, 80), pad, 2)
             screen.blit(big, bg_rect)
 
-        # --- Footer: KI-Hinweis, permanent sichtbar unter dem Spielfeld ---
+        # --- Footer: KI-Hinweis + Credits, permanent sichtbar unter dem
+        # Spielfeld, zwei zeilen (siehe FOOTER_HEIGHT) ---
         footer_y = HUD_HEIGHT + GRID_H * CELL
         pygame.draw.rect(screen, HUD_BG_COLOR, (0, footer_y, WINDOW_W, FOOTER_HEIGHT))
+        row_h = FOOTER_HEIGHT // 2
+        row1_y = footer_y + row_h // 2
+        row2_y = footer_y + row_h + row_h // 2
+
         footer_text = font_tiny.render(
             "Dieses Spiel wurde mit AI-Unterstuetzung generiert.",
             True, DIM_TEXT_COLOR)
-        screen.blit(footer_text, footer_text.get_rect(center=(WINDOW_W // 2, footer_y + FOOTER_HEIGHT // 2)))
+        screen.blit(footer_text, footer_text.get_rect(center=(WINDOW_W // 2, row1_y)))
         version_text = font_tiny.render(f"build {SERVER_BUILD}", True, DIM_TEXT_COLOR)
-        screen.blit(version_text, version_text.get_rect(right=WINDOW_W - 10, centery=footer_y + FOOTER_HEIGHT // 2))
+        screen.blit(version_text, version_text.get_rect(right=WINDOW_W - 10, centery=row1_y))
+
+        credits_text = font_tiny.render(
+            "Flynn font: Neale Davidson (Pixel Sagas)  ·  "
+            "WiC64 driver: Andreas Beermann (andi6510)",
+            True, DIM_TEXT_COLOR)
+        screen.blit(credits_text, credits_text.get_rect(center=(WINDOW_W // 2, row2_y)))
 
         pygame.display.flip()
         clock.tick(30)

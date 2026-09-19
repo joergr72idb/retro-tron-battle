@@ -603,12 +603,46 @@ statt eigene Testbilder anzulegen.
   `N:`-Netzwerk-Device-Konzept wie beim Atari, inklusive rohem TCP —
   Methode 1 (Port 6502) sollte sich also direkt anwenden lassen, ganz
   ohne Server-Änderung (siehe Abschnitt "Erweiterung um weitere
-  Retro-Computer" oben). Client müsste Applesoft-BASIC-Eigenheiten
-  klären (u.a. `PDL()`-Paddle-API statt `STICK()` fürs Joystick-Lesen)
-  und hätte vermutlich eigene, noch unbekannte Eigenheiten wie jede
-  bisherige Plattform. Kein Apple II in der eigenen Hardware-Sammlung
-  bisher — reine Nice-to-have-Idee, keine Priorität vor CC2026.
+  Retro-Computer" oben). Kein Apple II in der eigenen Hardware-Sammlung
+  bisher, geplanter erster Test über den "FujiNet Go"-Emulator auf
+  Handy/Tablet — reine Nice-to-have-Idee, keine Priorität vor CC2026.
   Quickstart: <https://github.com/FujiNetWIFI/fujinet-firmware/wiki/Apple-II-&-III-FujiNet-Quickstart-Guide>
+  - **Erster Client-Entwurf existiert bereits:**
+    [`clients/apple2/tron_apple2_client.bas`](./clients/apple2/tron_apple2_client.bas)
+    — **komplett unverifiziert, noch nie gelaufen**, weder auf echter
+    Hardware noch im Emulator. Anders als beim Atari-Client (CIO
+    `OPEN`/`PRINT#`/`INPUT#`) läuft Netzwerk auf Apple II über
+    FujiNet-spezifische Applesoft-"Ampersand"-Routinen
+    (`&NOPEN`/`&NREAD`/`&NWRITE`/`&NCLOSE`/`&NSTATUS`), die erst per
+    `BLOAD /FUJI.APPLE/FUJIAPPLE` + `CALL 16384` geladen werden müssen.
+    Aus dem FujiNet-Wiki (Seiten "Applesoft Network extensions" und
+    "N: SIO Command 'R' — Read") ließ sich kein vollständiges
+    funktionierendes TCP-Beispielprogramm finden — der Client ist aus
+    der reinen Parameter-Referenz gebaut, nicht aus einem bestätigten
+    Beispiel. **Bekannte offene Punkte, vor dem ersten Testlauf im
+    Hinterkopf behalten:**
+    - Ob `&NREAD`/`&NWRITE` blockieren oder sofort zurückkehren, ist in
+      der Doku nicht spezifiziert — der Client folgt dem empfohlenen
+      Muster "immer erst `&NSTATUS` fürs Byte-Waiting prüfen, dann erst
+      `&NREAD` mit genau dieser Byte-Anzahl" (die Doku warnt explizit
+      vor einem Fehler, wenn mehr Bytes angefragt werden als anliegen).
+    - Wie ein fehlgeschlagenes `&NOPEN` (z.B. Server nicht erreichbar)
+      sich bemerkbar macht, ist unbekannt — noch kein Applesoft-`ONERR
+      GOTO`-Fehlerhandling eingebaut (anders als das `TRAP`-basierte
+      beim Atari-Client).
+    - `PDL(0)`/`PDL(1)` fürs Joystick-Lesen: Center (`CX`/`CY`) und
+      Deadzone (`DZ`) sind im Kopf des Clients als Platzhalter (128/40)
+      hinterlegt — echte Paddle-/Joystick-Hardware braucht dafür
+      erfahrungsgemäß eine Kalibrierung pro Gerät.
+    - Applesoft unterscheidet Variablennamen historisch nur an den
+      ersten zwei Zeichen — der PIN-Eingabe-Variable bewusst `PN$`
+      genannt (nicht `PIN$`), da `PI` in Applesoft ein reserviertes
+      Schlüsselwort ist (Kreiszahl, dieselbe Fallgrube wie beim CPC,
+      siehe Muster 1 oben).
+    - Serverseitig ist `"APPLE2"` bereits in `PLATFORM_COLORS`/
+      `LOGO_NAME_CANDIDATES` in `server/tron_server.py` eingetragen
+      (amber Trail-Farbe), noch kein `assets/logos/apple2.*`-Bild
+      vorhanden.
 - **Fünfte Plattform: TI-99/4A via PicoPEB (ebenfalls nur bei Zeitüberschuss):**
   PicoPEB ist eine DIY-Nachbildung der TI-Peripheral-Expansion-Box auf
   Basis eines Raspberry Pi Pico W und emuliert u.a. ein RS232-Gerät mit

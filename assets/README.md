@@ -14,6 +14,7 @@ oder kleingeschrieben):
 - `atari.*` — Atari
 - `commodore.*` oder `c64.*` — Commodore 64
 - `schneider.*`, `cpc.*` oder `amstrad.*` — Schneider/Amstrad CPC
+- `apple2.*` oder `apple.*` — Apple II (experimentell, siehe CLAUDE.md)
 - `logo.*` — Vereinslogo der Veranstaltung (oben rechts, dauerhaft
   sichtbar)
 
