@@ -266,8 +266,8 @@ GREETING_TEXT = "THANKS A LOT!"  # <-- EDIT
 GREETING_DURATION = 20  # seconds the thank-you screen stays up
 # =============================================================================
 
-GRID_W = 60
-GRID_H = 32
+GRID_W = 50
+GRID_H = 30
 TICK_RATE = 8  # ticks/sec - keep modest, these are slow clients on real silicon
 
 CELL = 18             # pixel size of one grid cell in the display window
@@ -1220,6 +1220,33 @@ def pygame_loop():
             lines.append(cur)
         return lines
 
+    def wrap_url(text, font, max_width):
+        """Like wrap_text, but breaks at '/' instead of spaces - URLs don't
+        have spaces to wrap on. Each piece keeps its trailing '/' so it
+        still reads as a URL across lines."""
+        parts = []
+        cur_part = ""
+        for ch in text:
+            cur_part += ch
+            if ch == "/":
+                parts.append(cur_part)
+                cur_part = ""
+        if cur_part:
+            parts.append(cur_part)
+
+        lines = []
+        cur = ""
+        for p in parts:
+            test = cur + p
+            if not cur or font.size(test)[0] <= max_width:
+                cur = test
+            else:
+                lines.append(cur)
+                cur = p
+        if cur:
+            lines.append(cur)
+        return lines
+
     def draw_tribute():
         """Credits the projects behind the WiFi interfaces (TRIBUTE_ENTRIES
         in the config above) - third alternating waiting-screen view, see
@@ -1253,8 +1280,10 @@ def pygame_loop():
                 y += line_surf.get_height() + 4
 
             y += 8
-            url_surf = tribute_url_font.render(url, True, DIM_TEXT_COLOR)
-            screen.blit(url_surf, url_surf.get_rect(centerx=col_cx, top=y))
+            for line in wrap_url(url, tribute_url_font, col_w - 20):
+                line_surf = tribute_url_font.render(line, True, DIM_TEXT_COLOR)
+                screen.blit(line_surf, line_surf.get_rect(centerx=col_cx, top=y))
+                y += line_surf.get_height() + 2
 
     def draw_greeting():
         """A single thank-you (GREETING_IMAGE/GREETING_TEXT in the config
