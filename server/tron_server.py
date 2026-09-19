@@ -256,9 +256,9 @@ TRIBUTE_ENTRIES = [  # (bild, credit-text, anzuzeigende url) - <-- EDIT fuer eig
     (os.path.join(BASE_DIR, "assets/logos/projects/meatloaf.png"),
      "JAMIE JOHNSTON (IDOLPX) - MEATLOAF", "github.com/idolpx/meatloaf"),
     (os.path.join(BASE_DIR, "assets/logos/projects/m4.png"),
-     "DUKE - M4 INTERFACE", "cpcwiki.eu/index.php/M4_Board"),
+     "DUKE - M4 INTERFACE", "github.com/M4Duke/m4hardware"),
     (os.path.join(BASE_DIR, "assets/logos/projects/wic64.png"),
-     "WIC64 INTERFACE", "wic64.net/web/"),
+     "THE WIC64 PROJECT", "wic64.net/web/"),
 ]
 # =============================================================================
 
@@ -714,6 +714,10 @@ class HTTPPlayerConn:
         self._outbox = []
         self.closed = False
         self.session_id = session_id
+        self.platform = ""
+        self.name = ""
+        self.last_tick_at = None  # monotonic() beim letzten /tick, fuers
+        # tick-latency-logging in http_handle_request() weiter unten
 
     async def readline(self):
         return await self._inbox.get()
@@ -790,6 +794,8 @@ async def http_handle_request(path: str) -> str:
 
         session_id = uuid.uuid4().hex[:8].upper()
         conn = HTTPPlayerConn(session_id)
+        conn.platform = platform
+        conn.name = name
         http_sessions[session_id] = conn
         print(f"[http] JOIN: neue session gespeichert: {session_id!r}  (aktuelle keys: {list(http_sessions.keys())!r})")
 
@@ -813,6 +819,11 @@ async def http_handle_request(path: str) -> str:
             print(f"[http] TICK: gesuchte session {session_id!r} NICHT gefunden "
                   f"({reason}). aktuelle keys: {list(http_sessions.keys())!r}")
             return "ERR UNKNOWN SESSION"
+        now = time.monotonic()
+        if conn.last_tick_at is not None:
+            gap_ms = (now - conn.last_tick_at) * 1000
+            log(f"[tick-latency] {conn.platform}/{conn.name}: {gap_ms:.0f} ms since last /tick")
+        conn.last_tick_at = now
         if direction in HTTP_DIR_MAP:
             conn.feed_line(HTTP_DIR_MAP[direction])
         return conn.pop_outbox()
@@ -1417,7 +1428,8 @@ def pygame_loop():
 
         credits_text = font_tiny.render(
             "Flynn font: Neale Davidson (Pixel Sagas)  ·  "
-            "WiC64 driver: Andreas Beermann (andi6510)",
+            "WiC64 HTTP-Requester: Andreas Beermann (andi6510) · "
+            "Jürgen Leber (JogiBaer) made my M4 ;-)",
             True, DIM_TEXT_COLOR)
         screen.blit(credits_text, credits_text.get_rect(center=(WINDOW_W // 2, row2_y)))
 
