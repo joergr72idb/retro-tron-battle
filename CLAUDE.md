@@ -331,8 +331,33 @@ zu erreichen:
     HTTP-Polling hat generell einen spürbaren Latenz-Sockel gegenüber
     Atars rohem TCP, aber der ist bei Meatloaf offenbar akzeptabel
     (Client gilt seit vielen echten Spielen als stabil) - WiC64s
-    ~1280 ms sind nochmal eine andere Größenordnung. CPC-Messung
-    weiterhin offen.
+    ~1280 ms sind nochmal eine andere Größenordnung.
+  - **Vergleichsmessung CPC/M4 (2026-09-19, ECHTE HARDWARE - nicht
+    Emulator):** Im Steady State **542–559 ms** pro `/tick` (Solo-Test)
+    bzw. **543–551 ms** (im anschließenden echten Spiel gegen den
+    Meatloaf-Client, s.u.) — liegt damit zwischen Meatloaf (~300 ms)
+    und WiC64 (~1280 ms), rund **1,8x langsamer als Meatloaf**, aber
+    **2,3x schneller als WiC64**. Bei `TICK_RATE=8` (125 ms/Tick) macht
+    das rund **4,4 Server-Ticks pro CPC-Eingabe**. Erklärt sich
+    plausibel durch die bereits in `CLAUDE.md` dokumentierte
+    `|HTTPMEM`-Eigenschaft, während des Abrufs jede andere Verarbeitung
+    zu blockieren. Auch hier einmalig ein Ausreißer (1095 ms statt
+    ~550 ms) im späteren Spiel beobachtet, gleiches Bild wie beim
+    Meatloaf-Ausreißer oben - einmalig, kein Muster.
+  - **Rangfolge nach dieser ersten Messrunde (schnellste zuerst):**
+    Atari (rohes TCP, praktisch verzögerungsfrei) < Meatloaf (~300 ms,
+    ~2,4 Ticks) < CPC/M4 (~550 ms, ~4,4 Ticks) < WiC64 (~1280 ms,
+    ~10 Ticks). Alle drei HTTP-Polling-Werte liegen deutlich über
+    `TICK_RATE`s 125 ms, das Spiel funktioniert trotzdem seit vielen
+    Spielen zuverlässig - spricht weiterhin dagegen, `TICK_RATE` als
+    Reaktion darauf zu verändern (siehe Einordnung oben).
+  - **Erster echter Hardware-Crossplay-Smoketest (2026-09-19):**
+    CPC/M4 vs. C64/Meatloaf, beide auf echter Hardware, endete mit
+    "draw (simultaneous crash)" nach ~7 Sekunden - Pairing/Countdown/
+    Bewegung/Kollisionserkennung/Spielende liefen sauber durch. Erste
+    von der Testcheckliste (`docs/hardware_test_checklist.pdf`,
+    Abschnitt 5) tatsächlich auf echter Hardware durchgespielte
+    Cross-Platform-Paarung.
 
 ## UI-Vereinfachung aller Clients (2026-09-12)
 
@@ -699,14 +724,21 @@ statt eigene Testbilder anzulegen.
 - **Alle vier Clients** (Atari, C64/Meatloaf, C64/WiC64, CPC): am
   2026-09-12 UI-seitig radikal vereinfacht — ASCII-Kunst-Anzeige,
   Terminal-Tippeffekt und MCP-Storyline entfernt, siehe Abschnitt
-  "UI-Vereinfachung aller Clients" oben. Noch nicht auf allen vier
-  Plattformen nach dieser Vereinfachung erneut auf Hardware verifiziert.
+  "UI-Vereinfachung aller Clients" oben. C64/Meatloaf und CPC/M4 am
+  2026-09-19 auf echter Hardware nach der Vereinfachung erneut
+  verifiziert (siehe direkt unten); Atari und C64/WiC64 stehen das
+  noch aus.
 - **Atari-Client**: bisher stabil (vor der Vereinfachung).
 - **C64-Client (Meatloaf)**: Session-Mismatch-Bug (ungeprüfte
-  Join-Antwort) am 2026-09-12 auf echter Hardware gefunden und gefixt,
-  siehe Lektion oben — Fix noch nicht erneut auf Hardware verifiziert.
+  Join-Antwort) am 2026-09-12 auf echter Hardware gefunden und gefixt.
+  Am 2026-09-19 auf echter Hardware erneut verifiziert (`/tick`-Latenz
+  ~300 ms, siehe Vergleichsmessung im WiC64-Abschnitt oben) - Fix hält.
 - **CPC-Client**: bisher stabil (vor der Vereinfachung); denselben
   Join-Antwort-Fix wie beim Meatloaf-Client vorsorglich mitbekommen.
+  Am 2026-09-19 auf echter Hardware nach der Vereinfachung verifiziert
+  (`/tick`-Latenz ~550 ms, siehe Vergleichsmessung oben) - inklusive
+  eines erfolgreichen Cross-Platform-Matches gegen den Meatloaf-Client
+  (draw, siehe "Erster echter Hardware-Crossplay-Smoketest" oben).
 - **C64-Client (WiC64)**: experimentell, keine physische Hardware
   vorhanden (siehe "Ideen für später"/Testcheckliste). Spielverbindung
   (`/join`/`/tick`) hatte einen Bug (URL-Großschreibung + fehlende
