@@ -6,13 +6,13 @@
 15 rem (geraet 8, sekundaeradresse 3) statt
 16 rem des unbestaetigten rohen sockets.
 17 rem joystick in port 2 (port 1 teilt sich leitungen mit der tastatur).
-18 rem ===================================
+18 rem ===== restart-punkt, per "run" erreicht (siehe unten) =====
 20 print chr$(147);chr$(14)
 21 print chr$(18);
 22 for i=1 to 40:print " ";:next i:print
 23 print "   retro tron battle -"
 24 print "   classic computing 2026"
-25 print "     commodore 64 edition - build 15"
+25 print "     commodore 64 edition - build 16"
 26 for i=1 to 40:print " ";:next i:print
 27 print chr$(146)
 28 print
@@ -70,13 +70,13 @@
 520 rem -- spiel zu ende: ergebnis zeigen, dann neustart --
 521 print "game over":print r$
 525 print "restarting..."
-527 for dl=1 to 10:for w=1 to 1500:next w:next dl :rem ca. 10 sek, bei bedarf anpassen
-528 goto 20
+527 for dl=1 to 3:for w=1 to 1500:next w:next dl :rem ca. 3 sek, bei bedarf anpassen
+528 run
 560 if gs=0 then 400 :rem noch kein gegner - das darf beliebig lange dauern
 561 ec=ec+1
-562 if ec>500 then print "no response - restarting...":goto 20
+562 if ec>500 then print "no response - restarting...":run
 563 goto 400
-800 print "restarting...":goto 20
+800 print "restarting...":run
 2000 rem -- http get u$ -> r$ (das bestaetigt funktionierende muster) --
 2010 open 1,8,3,u$
 2020 r$=""

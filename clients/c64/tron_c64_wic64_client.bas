@@ -11,12 +11,13 @@
 44 rem    port 2 braucht den kernal-tastatur-scan-irq, um sich zwischen
 45 rem    abfragen in den ruhezustand zurueckzusetzen).
 46 poke828,88:poke829,96
-50 rem -- neustart-punkt nach jedem spiel (laden/init nur einmal) --
+50 rem -- neustart-punkt, per "run" erreicht (laden/init nur einmal, --
+51 rem    zeile10-checkt ob treiber schon geladen ist) --
 60 print chr$(147);chr$(14);chr$(18)
 70 for i=1 to 40:print" ";:next i:print
 80 print"   RETRO TRON BATTLE -"
 90 print"   CLASSIC COMPUTING 2026"
-100 print"     COMMODORE 64 / WIC64 EDITION - BUILD 7"
+100 print"     COMMODORE 64 / WIC64 EDITION - BUILD 8"
 110 for i=1 to 40:print" ";:next i:print
 120 print chr$(146):print
 130 ho$="192.168.17.158":rem <-- edit: server ip
@@ -78,9 +79,9 @@
 700 rem -- spiel zu ende: ergebnis zeigen, dann neustart --
 710 print"game over":printr$
 720 print"restarting..."
-740 fordl=1to10:forw=1to1500:nextw:nextdl
-750 goto50
-900 print"restarting...":goto50
+740 fordl=1to3:forw=1to1500:nextw:nextdl:rem ca.3sek
+750 run
+900 print"restarting...":run
 2000 rem -- wic64-http-abruf: url in u$ -> ergebnis in r$. nutzt die --
 2001 rem    wiederverwendete fotofix.c000-treiberroutine (sys49152). --
 2010 fori=0to199:pokeda+i,0:nexti
