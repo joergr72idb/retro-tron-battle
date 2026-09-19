@@ -16,7 +16,7 @@
 26 for i=1 to 40:print " ";:next i:print
 27 print chr$(146)
 28 print
-30 ho$="192.168.17.158":rem <-- edit: server ip
+30 ho$="192.168.17.138":rem <-- edit: server ip
 40 po$="8080":rem <-- edit: http-bridge-port! (siehe server-startmeldung,
 41 rem     NICHT der tcp-spielport 6502 - die http-bridge laeuft separat)
 50 na$="COMMODORE64":rem <-- edit: dein spielername

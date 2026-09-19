@@ -20,7 +20,7 @@
 100 print"     COMMODORE 64 / WIC64 EDITION - BUILD 8"
 110 for i=1 to 40:print" ";:next i:print
 120 print chr$(146):print
-130 ho$="192.168.17.158":rem <-- edit: server ip
+130 ho$="192.168.17.138":rem <-- edit: server ip
 140 po$="8080":rem <-- edit: http-bridge-port! (siehe server-startmeldung)
 150 na$="COMMODORE64":rem <-- edit: spielername
 160 da=8190:rem zieladresse fuer wic64-abrufe (=$1ffe, wie im fotofix-beispiel)
