@@ -173,6 +173,15 @@ CSV_FIELDNAMES = ["timestamp", "p1_platform", "p1_name", "p2_platform", "p2_name
 # =============================================================================
 
 # =============================================================================
+# LOG-DATEI - ZUSAETZLICH ZUR KONSOLE, FUERS DEBUGGING WAEHREND HARDWARE-TESTS
+# =============================================================================
+# Alles, was ueber log() (statt print()) ausgegeben wird, landet sowohl auf
+# der Konsole als auch angehaengt in dieser Datei - u.a. Steuerungsbefehle
+# (siehe drain_moves()) und ein durchsuchbarer Header pro Spielstart.
+LOG_FILE_PATH = os.path.join(BASE_DIR, "tron_server.log")  # <-- EDIT: Pfad zur Log-Datei
+# =============================================================================
+
+# =============================================================================
 # EVENT-FOTO / LOGO-KONFIGURATION - DIESEN BLOCK FUER EURE VERANSTALTUNG ANPASSEN
 # =============================================================================
 # Besucher bekommen eine PIN (z.B. "MUSTER"), die mit einem Foto von ihnen
@@ -354,6 +363,18 @@ def event_logo_path():
         if os.path.exists(p):
             return p
     return None
+
+
+def log(msg: str) -> None:
+    """Wie print(), haengt msg zusaetzlich an LOG_FILE_PATH an (siehe Config
+    oben). Fehler beim Dateizugriff sollen das Spiel nie abbrechen - im
+    Zweifel landet die Meldung dann eben nur auf der Konsole."""
+    print(msg)
+    try:
+        with open(LOG_FILE_PATH, "a", encoding="utf-8") as f:
+            f.write(msg + "\n")
+    except OSError as e:
+        print(f"[log] konnte nicht nach {LOG_FILE_PATH} schreiben: {e}")
 
 
 @dataclass
@@ -829,8 +850,14 @@ async def drain_moves(players):
                 tokens = line.split()
                 if len(tokens) > 1 and tokens[1] in DIRS:
                     d = tokens[1]
-                    if d != OPPOSITE.get(p.direction):
+                    if d == OPPOSITE.get(p.direction):
+                        log(f"[move] {p.platform}/{p.name}: {d} ignoriert (Kehrtwende von {p.direction})")
+                    elif d != p.direction:
+                        log(f"[move] {p.platform}/{p.name}: {p.direction} -> {d}")
                         p.direction = d
+                    # sonst: client sendet dieselbe richtung erneut (z.b. bei
+                    # http-polling-clients normal) - nicht loggen, sonst flutet
+                    # das die datei ohne neue information.
             elif line == "BYE":
                 p.alive = False
 
@@ -850,7 +877,10 @@ async def run_game(p1: Player, p2: Player):
 
     await send(p1.writer, f"START {GRID_W} {GRID_H} {p1.x} {p1.y} {p2.x} {p2.y} 1 {p1.platform} {p2.platform}")
     await send(p2.writer, f"START {GRID_W} {GRID_H} {p1.x} {p1.y} {p2.x} {p2.y} 2 {p1.platform} {p2.platform}")
-    print(f"[*] Game start: {p1.platform}/{p1.name} vs {p2.platform}/{p2.name}")
+    log("=" * 60)
+    log(f"[*] GAME START {datetime.now().isoformat(timespec='seconds')} - "
+        f"{p1.platform}/{p1.name} vs {p2.platform}/{p2.name}")
+    log("=" * 60)
 
     photo1, photo2 = await asyncio.gather(resolve_photo(p1), resolve_photo(p2))
 
@@ -923,13 +953,14 @@ async def run_game(p1: Player, p2: Player):
         append_result_to_csv(p1, p2, "WIN", winner.platform, winner.name)
         result = f"END WIN {winner.platform} {winner.name}"
         status = f"{winner.platform}/{winner.name} WINS!"
-        print(f"[=] {winner.platform}/{winner.name} wins!")
+        log(f"[=] GAME END {datetime.now().isoformat(timespec='seconds')} - "
+            f"{winner.platform}/{winner.name} wins!")
     else:
         stats.record_draw()
         append_result_to_csv(p1, p2, "DRAW")
         result = "END DRAW"
         status = "DRAW - SIMULTANEOUS CRASH!"
-        print("[=] Draw (simultaneous crash)")
+        log(f"[=] GAME END {datetime.now().isoformat(timespec='seconds')} - draw (simultaneous crash)")
 
     update_render(phase="ended", status=status,
                   games_played=stats.games_played, wins=dict(stats.wins), draws=stats.draws)
