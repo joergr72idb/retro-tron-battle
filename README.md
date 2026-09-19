@@ -44,8 +44,8 @@ clients/    BASIC-Clients pro Plattform
             siehe CLAUDE.md
 bots/       Automatisierte Test-Bots (Bash/PowerShell) zum Spielen ohne
             echte Hardware, z.B. für Demos oder Lasttests
-tools/      Diagnose-/Testprogramme für einzelne Plattformen, plus
-            gebündelte Drittanbieter-Tools (d64-inspector, C64-TrueType-
+tools/      Diagnose-/Testprogramme für einzelne Plattformen, plus Links
+            auf externe Drittanbieter-Tools (d64-inspector, C64-TrueType-
             Font) - siehe README dort
 docs/       PDF-Dokumentation (Protokoll, Erweiterung um weitere Plattformen)
 disk-images/ Fertige Referenz-Disk-Images (Atari/CPC/C64) zum Aufsetzen

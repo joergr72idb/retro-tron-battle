@@ -340,10 +340,10 @@ zu erreichen:
     — rund **4x schneller als WiC64** (~1280 ms), aber immer noch gut
     **2,4x langsamer als `TICK_RATE=8`** (125 ms/Tick) — auch der
     "verlässliche" HTTP-Polling-Client bekommt also nur etwa alle 2-3
-    Server-Ticks eine neue Eingabe durch, nicht jeden. Einmalig ein
-    Ausreißer von 1444 ms beobachtet (Ursache unklar - GC-Pause,
-    OS-Scheduling-Jitter im Emulator, oder eine intern wiederholte
-    Anfrage - bisher einmalig, kein wiederkehrendes Muster). Bestätigt:
+    Server-Ticks eine neue Eingabe durch, nicht jeden. Ein Ausreißer von
+    1444 ms beobachtet — inzwischen (siehe "Reproduzierbarer
+    Latenz-Ausreißer" weiter unten) als wiederkehrendes, gut erklärbares
+    Muster erkannt, kein Zufall. Bestätigt:
     HTTP-Polling hat generell einen spürbaren Latenz-Sockel gegenüber
     Atars rohem TCP, aber der ist bei Meatloaf offenbar akzeptabel
     (Client gilt seit vielen echten Spielen als stabil) - WiC64s
@@ -357,9 +357,10 @@ zu erreichen:
     das rund **4,4 Server-Ticks pro CPC-Eingabe**. Erklärt sich
     plausibel durch die bereits in `CLAUDE.md` dokumentierte
     `|HTTPMEM`-Eigenschaft, während des Abrufs jede andere Verarbeitung
-    zu blockieren. Auch hier einmalig ein Ausreißer (1095 ms statt
-    ~550 ms) im späteren Spiel beobachtet, gleiches Bild wie beim
-    Meatloaf-Ausreißer oben - einmalig, kein Muster.
+    zu blockieren. Auch hier ein Ausreißer (1095 ms statt ~550 ms) im
+    späteren Spiel beobachtet, gleiches Bild wie beim Meatloaf-Ausreißer
+    oben — ebenfalls Teil des unten dokumentierten reproduzierbaren
+    Musters.
   - **Rangfolge nach dieser ersten Messrunde (schnellste zuerst):**
     Atari (rohes TCP, praktisch verzögerungsfrei) < Meatloaf (~300 ms,
     ~2,4 Ticks) < CPC/M4 (~550 ms, ~4,4 Ticks) < WiC64 (~1280 ms,
@@ -386,6 +387,39 @@ zu erreichen:
     aktiver Steuerung) anfühlt. Diese Paarung aus der Testcheckliste
     (`docs/hardware_test_checklist.pdf`, Abschnitt 5) gilt deshalb
     weiterhin als offen, sobald Joysticks + Upscaler da sind.
+    **Update (2026-09-20): Joysticks sind da, jetzt echt verifiziert**
+    — siehe die beiden folgenden Einträge.
+  - **Reproduzierbarer Latenz-Ausreißer, immer der 2. `/tick` nach
+    `GAME START` (2026-09-20):** Über vier echte Matches (CPC vs. Atari,
+    CPC vs. Meatloaf x3) hinweg zeigt sich derselbe Ausreißer aus den
+    Messungen oben nicht als Zufall, sondern als reproduzierbares
+    Muster: **immer genau die zweite geloggte `/tick`-Latenz nach dem
+    `GAME START`-Header** liegt deutlich über dem sonstigen Steady
+    State (z.B. CPC 917/883/895 ms statt ~550 ms; C64 1490 ms statt
+    ~350 ms in einem der Matches) — betrifft dabei nicht immer dieselbe
+    Plattform, sondern offenbar wer auch immer gerade während des
+    fraglichen Zeitfensters kurz nach Spielstart pollt. Eine naheliegende
+    Ursache wurde geprüft und ausgeschlossen: Der Besucherfoto-Abruf
+    (`resolve_photo`/`fetch_photo_blocking`) läuft bereits korrekt über
+    `run_in_executor` in einem separaten Thread, blockiert die
+    Event-Loop also nicht. Tatsächliche Ursache noch offen (Verdacht:
+    irgendetwas im Countdown-Uebergang in `run_game()` - 3-2-1-Countdown
+    + "Go, get in there!"-Pause), aber unkritisch: tritt genau einmal
+    pro Match auf, immer bevor der Spieler wirklich steuert (waehrend
+    Countdown/kurz danach), alle Ticks *waehrend* des eigentlichen
+    Duells bleiben stabil im Steady State. Nicht vor CC2026 verfolgen,
+    es sei denn es taucht ploetzlich auch mitten im Spiel auf.
+  - **Erster ECHTER Hardware-Crossplay-Test mit Steuerung (2026-09-20):**
+    Mit angeschlossenen Joysticks liefen mehrere echte Matches CPC/M4
+    vs. Atari sowie CPC/M4 vs. C64/Meatloaf (jeweils mehrfach) - beide
+    Seiten haben sichtbar gesteuert (`[move]`-Logeinträge auf beiden
+    Plattformen), Ergebnisse wechselten zwischen beiden Seiten (kein
+    einseitiger Vorteil erkennbar). Bestätigt gleichzeitig auf echter
+    Hardware: der Meatloaf-Fix von 2026-09-20 (`START`/`ERR`/`END` in
+    Groß-/Kleinschreibung) haelt - "USE JOYSTICK" erscheint jetzt
+    zuverlaessig beim Spielstart. Damit sind aus der Testcheckliste
+    (Abschnitt 5) die Paarungen **Atari vs. CPC** und **C64 (Meatloaf)
+    vs. CPC** jetzt mit echter Steuerung verifiziert.
 
 ## UI-Vereinfachung aller Clients (2026-09-12)
 
@@ -631,18 +665,11 @@ Funktionstests sind nur mit Emulator/Hardware durch den Nutzer möglich.
 - **Basic-Programme in ein D64-Image packen** (für C64-Tests, z.B. mit
   VICE): [d64-inspector](https://github.com/pdbuchan/d64-inspector)
   (Autor: P. David Buchan, GPLv3) hat sich dafür als nützlich erwiesen —
-  Quellcode liegt unter [`tools/d64-inspector/`](./tools/d64-inspector/)
-  im Repo (aus dem Original-Git-Clone übernommen, ohne `.git`- und
-  Build-Artefakte). Für die PETSCII-Ansicht nutzt d64-inspector selbst
-  die [C64 TrueType](https://style64.org/c64-truetype)-Fontfamilie
-  (Autor: "Style", style64.org), ebenfalls im Repo unter
-  [`tools/C64_TrueType_v1.2.1-STYLE/`](./tools/C64_TrueType_v1.2.1-STYLE/)
-  (unveränderte Distribution, siehe Lizenz dort). **Vor dem Bauen unter
-  Ubuntu:** `sudo apt install build-essential pkg-config libgtk-4-dev`,
-  dann die TrueType-Fonts aus `tools/C64_TrueType_v1.2.1-STYLE/fonts/`
-  installieren (für die PETSCII-Anzeige gedacht), danach `make` in
-  `tools/d64-inspector/src/`. Referenz-Disk-Images (u.a. für Atari/CPC)
-  liegen unter [`disk-images/`](./disk-images/), siehe README dort.
+  nicht mehr im Repo gebündelt (siehe [`tools/README.md`](./tools/README.md)
+  für Download-/Baulinks, inkl. der für die PETSCII-Ansicht benötigten
+  [C64 TrueType](https://style64.org/c64-truetype)-Fontfamilie, Autor:
+  "Style"). Referenz-Disk-Images (u.a. für Atari/CPC) liegen unter
+  [`disk-images/`](./disk-images/), siehe README dort.
 
 ### Foto-/FTP-Infrastruktur lokal simulieren
 
@@ -756,20 +783,28 @@ statt eigene Testbilder anzulegen.
   2026-09-19 auf echter Hardware nach der Vereinfachung erneut
   verifiziert (siehe direkt unten); Atari und C64/WiC64 stehen das
   noch aus.
-- **Atari-Client**: bisher stabil (vor der Vereinfachung).
+- **Atari-Client**: bisher stabil (vor der Vereinfachung). Am
+  2026-09-20 in mehreren echten, gesteuerten Cross-Platform-Matches
+  gegen den CPC-Client bestätigt (siehe unten).
 - **C64-Client (Meatloaf)**: Session-Mismatch-Bug (ungeprüfte
   Join-Antwort) am 2026-09-12 auf echter Hardware gefunden und gefixt.
   Am 2026-09-19 auf echter Hardware erneut verifiziert (`/tick`-Latenz
   ~300 ms, siehe Vergleichsmessung im WiC64-Abschnitt oben) - Fix hält.
+  Der weitere Groß-/Kleinschreibungs-Fix vom 2026-09-20 ("Hauptschleife
+  pruefte START/ERR/END nur in Kleinschreibung", siehe Meatloaf-
+  Abschnitt oben) am selben Tag in mehreren echten, gesteuerten
+  Cross-Platform-Matches gegen den CPC-Client bestätigt - "USE
+  JOYSTICK" erscheint jetzt zuverlässig.
 - **CPC-Client**: bisher stabil (vor der Vereinfachung); denselben
   Join-Antwort-Fix wie beim Meatloaf-Client vorsorglich mitbekommen.
   Am 2026-09-19 auf echter Hardware nach der Vereinfachung verifiziert
-  (`/tick`-Latenz ~550 ms, siehe Vergleichsmessung oben) - inklusive
-  eines Cross-Platform-Matches gegen den Meatloaf-Client (draw), **aber
-  ohne angeschlossene Joysticks** (Joysticks/Upscaler noch nicht da) -
-  Pairing/Protokoll/Latenz bestätigt, echtes gesteuertes Duell auf
-  beiden Plattformen steht noch aus, siehe Korrektur-Eintrag im
-  WiC64-Abschnitt oben ("Erster echter Hardware-Crossplay-Smoketest").
+  (`/tick`-Latenz ~550 ms, siehe Vergleichsmessung oben). Am 2026-09-20,
+  jetzt mit angeschlossenen Joysticks, mehrere echte gesteuerte
+  Cross-Platform-Matches gegen Atari und gegen Meatloaf gespielt -
+  Ergebnisse wechselten zwischen beiden Seiten, kein einseitiger
+  Nachteil erkennbar trotz unterschiedlicher `/tick`-Latenz. Siehe
+  "Erster ECHTER Hardware-Crossplay-Test mit Steuerung" im
+  WiC64-Abschnitt oben.
 - **C64-Client (WiC64)**: experimentell, keine physische Hardware
   vorhanden (siehe "Ideen für später"/Testcheckliste). Spielverbindung
   (`/join`/`/tick`) hatte einen Bug (URL-Großschreibung + fehlende
