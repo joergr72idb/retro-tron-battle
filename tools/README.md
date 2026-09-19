@@ -8,7 +8,13 @@ Spiels, aber nützlich als Ausgangspunkt für ähnliche Diagnosen auf einer
 neuen Plattform:
 
 - `atari_http_test.bas` - isolierter FujiNet-`N:HTTP`-Test
-- `joystick_test.bas` / `joystick_network_test.bas` - Joystick-Port-Tests
+- `atari_joystick_test.bas` / `joystick_network_test.bas` - Atari-Joystick-Port-Tests
+  (Standalone bzw. mit Networking, siehe unten)
+- `c64_joystick_test.bas` - Standalone-Joystick-Test fuer C64, zeigt Port 1
+  ($dc01) und Port 2 ($dc00) gleichzeitig live an, um das Keyboard-Scan-
+  Ghosting-Problem (siehe `CLAUDE.md`) direkt sichtbar zu machen
+- `cpc_joystick_test.bas` - Standalone-Joystick-Test fuer Schneider CPC
+  (`JOY(0)`, raw + dekodiert)
 - `meatloaf_netztest.bas` - isolierter Meatloaf-HTTP-Test
 
 ## Gebündelte Drittanbieter-Tools
