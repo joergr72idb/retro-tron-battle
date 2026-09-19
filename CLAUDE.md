@@ -351,13 +351,25 @@ zu erreichen:
     `TICK_RATE`s 125 ms, das Spiel funktioniert trotzdem seit vielen
     Spielen zuverlässig - spricht weiterhin dagegen, `TICK_RATE` als
     Reaktion darauf zu verändern (siehe Einordnung oben).
-  - **Erster echter Hardware-Crossplay-Smoketest (2026-09-19):**
-    CPC/M4 vs. C64/Meatloaf, beide auf echter Hardware, endete mit
-    "draw (simultaneous crash)" nach ~7 Sekunden - Pairing/Countdown/
-    Bewegung/Kollisionserkennung/Spielende liefen sauber durch. Erste
-    von der Testcheckliste (`docs/hardware_test_checklist.pdf`,
-    Abschnitt 5) tatsächlich auf echter Hardware durchgespielte
-    Cross-Platform-Paarung.
+  - **Erster echter Hardware-Crossplay-Smoketest (2026-09-19) —
+    KORREKTUR, kein echter Spieltest:** CPC/M4 vs. C64/Meatloaf, beide
+    auf echter Hardware, endete mit "draw (simultaneous crash)" nach
+    ~7 Sekunden. **Wichtige Einschränkung (nachträglich vom Nutzer
+    klargestellt):** Beide Clients liefen dabei OHNE angeschlossenen
+    Joystick (Joysticks + Upscaler zum Testzeitpunkt noch nicht da,
+    beides "on the way") — beide Spieler haben sich also nie bewegt
+    (`STICK`/`PEEK` liest konstant "keine Eingabe", Server bekommt
+    durchgehend Richtung "N"), das "draw" kam vermutlich einfach vom
+    gleichzeitigen Ablauf der Countdown-/Spiel-Logik, nicht von echtem
+    Steuern. **Was das trotzdem zeigt:** Pairing, `/join`+`/tick`-
+    Protokoll, Latenz-Messung und Spielende-Ablauf funktionieren
+    Ende-zu-Ende auf echter Hardware für beide Plattformen gleichzeitig
+    - das war schon nützlich. **Was es NICHT zeigt:** ob Steuern per
+    Joystick auf beiden Plattformen tatsächlich funktioniert und wie
+    sich ein *echtes* Duell (inkl. Kollisionsvermeidung/-erkennung bei
+    aktiver Steuerung) anfühlt. Diese Paarung aus der Testcheckliste
+    (`docs/hardware_test_checklist.pdf`, Abschnitt 5) gilt deshalb
+    weiterhin als offen, sobald Joysticks + Upscaler da sind.
 
 ## UI-Vereinfachung aller Clients (2026-09-12)
 
@@ -737,8 +749,11 @@ statt eigene Testbilder anzulegen.
   Join-Antwort-Fix wie beim Meatloaf-Client vorsorglich mitbekommen.
   Am 2026-09-19 auf echter Hardware nach der Vereinfachung verifiziert
   (`/tick`-Latenz ~550 ms, siehe Vergleichsmessung oben) - inklusive
-  eines erfolgreichen Cross-Platform-Matches gegen den Meatloaf-Client
-  (draw, siehe "Erster echter Hardware-Crossplay-Smoketest" oben).
+  eines Cross-Platform-Matches gegen den Meatloaf-Client (draw), **aber
+  ohne angeschlossene Joysticks** (Joysticks/Upscaler noch nicht da) -
+  Pairing/Protokoll/Latenz bestätigt, echtes gesteuertes Duell auf
+  beiden Plattformen steht noch aus, siehe Korrektur-Eintrag im
+  WiC64-Abschnitt oben ("Erster echter Hardware-Crossplay-Smoketest").
 - **C64-Client (WiC64)**: experimentell, keine physische Hardware
   vorhanden (siehe "Ideen für später"/Testcheckliste). Spielverbindung
   (`/join`/`/tick`) hatte einen Bug (URL-Großschreibung + fehlende
