@@ -244,6 +244,35 @@ LOGO_NAME_CANDIDATES = {
 LOGO_EXTENSIONS = [".png", ".PNG", ".jpg", ".JPG", ".jpeg", ".JPEG", ".gif", ".GIF", ".bmp", ".BMP"]
 # =============================================================================
 
+# =============================================================================
+# TRIBUTE-BILDSCHIRM - DRITTE WARTEBILDSCHIRM-ANSICHT (NACH SCROLLTEXT UND
+# HIGHSCORE-LISTE), WUERDIGT DIE PROJEKTE HINTER DEN WIFI-INTERFACES
+# =============================================================================
+TRIBUTE_TITLE = "SPECIAL THANKS TO"  # <-- EDIT: eigener text
+TRIBUTE_DURATION = 30  # sekunden, die der tribute-bildschirm steht
+TRIBUTE_ENTRIES = [  # (bild, credit-text, anzuzeigende url) - <-- EDIT fuer eigene credits
+    (os.path.join(BASE_DIR, "assets/logos/projects/fujinet.jpg"),
+     "THE FUJINET PROJECT", "fujinet.online"),
+    (os.path.join(BASE_DIR, "assets/logos/projects/meatloaf.png"),
+     "JAMIE JOHNSTON (IDOLPX) - MEATLOAF", "github.com/idolpx/meatloaf"),
+    (os.path.join(BASE_DIR, "assets/logos/projects/m4.png"),
+     "DUKE - M4 INTERFACE", "cpcwiki.eu/index.php/M4_Board"),
+    (os.path.join(BASE_DIR, "assets/logos/projects/wic64.png"),
+     "WIC64 INTERFACE", "wic64.net/web/"),
+]
+# =============================================================================
+
+# =============================================================================
+# FOTOFIX-DANK - VIERTE WARTEBILDSCHIRM-ANSICHT (NACH DEM TRIBUTE-BILDSCHIRM),
+# EINZELNES DANKESCHOEN - z.b. an eine person/ein projekt, das keinen platz
+# in der TRIBUTE_ENTRIES-liste oben braucht (aktuell: das FOTOFIX-Projekt,
+# siehe clients/c64/wic64-driver/README.md)
+# =============================================================================
+GREETING_IMAGE = os.path.join(BASE_DIR, "assets/logos/greetings/greeting.jpg")  # <-- EDIT
+GREETING_TEXT = "THANKS A LOT!"  # <-- EDIT
+GREETING_DURATION = 20  # sekunden, die der dank-bildschirm steht
+# =============================================================================
+
 GRID_W = 60
 GRID_H = 32
 TICK_RATE = 8  # ticks/sek - bescheiden halten, das sind langsame clients auf echtem silizium
@@ -1043,6 +1072,9 @@ def pygame_loop():
     scroll_font = load_tron_font(SCROLL_FONT_SIZE)
     highscore_title_font = load_tron_font(84)
     highscore_row_font = load_tron_font(42)
+    tribute_title_font = load_tron_font(40)
+    tribute_caption_font = load_tron_font(24)
+    tribute_url_font = load_tron_font(16)
 
     # Demo-Scroller Zustand: laeuft nur weiter/wird nur gezeichnet, solange
     # die Server-Phase "waiting" ist (siehe Hauptschleife weiter unten).
@@ -1052,14 +1084,16 @@ def pygame_loop():
     scroll_wave_phase = 0.0
     scroll_hue = 0.0
 
-    # Wartebildschirm wechselt sich zwischen scrolltext und highscore-liste
-    # ab: nach SCROLL_LOOPS_BEFORE_HIGHSCORE vollen durchlaeufen des scrollers
-    # kommt die liste fuer HIGHSCORE_DURATION sekunden, danach geht's mit
-    # dem scroller weiter (siehe SCROLL_LOOPS_BEFORE_HIGHSCORE/HIGHSCORE_DURATION
-    # oben in der config).
+    # Wartebildschirm wechselt sich ab, solange auf spieler gewartet wird:
+    # scrolltext (SCROLL_LOOPS_BEFORE_HIGHSCORE volle durchlaeufe) -> high-
+    # score-liste (HIGHSCORE_DURATION sekunden) -> tribute-bildschirm
+    # (TRIBUTE_DURATION sekunden) -> fotofix-dank (GREETING_DURATION sekunden)
+    # -> wieder scrolltext, usw. (siehe config oben).
     waiting_mode = "scroll"
     scroll_loop_count = 0
     highscore_shown_until = 0.0
+    tribute_shown_until = 0.0
+    greeting_shown_until = 0.0
 
     # Geladene+skalierte Bilder nach (pfad, max_b, max_h) cachen, damit wir
     # nicht bei jedem einzelnen Frame dasselbe JPEG/PNG neu dekodieren.
@@ -1159,6 +1193,80 @@ def pygame_loop():
             f"Games played: {games_played}   Draws: {draws}", True, DIM_TEXT_COLOR)
         screen.blit(footer, footer.get_rect(centerx=cx, top=y))
 
+    def wrap_text(text, font, max_width):
+        """Zerlegt text in zeilen, die jeweils in max_width passen (wortweise
+        umgebrochen) - fuer credit-texte unbekannter/wechselnder Laenge in
+        draw_tribute()."""
+        words = text.split(" ")
+        lines = []
+        cur = ""
+        for w in words:
+            test = (cur + " " + w).strip()
+            if not cur or font.size(test)[0] <= max_width:
+                cur = test
+            else:
+                lines.append(cur)
+                cur = w
+        if cur:
+            lines.append(cur)
+        return lines
+
+    def draw_tribute():
+        """Wuerdigt die Projekte hinter den WiFi-Interfaces (TRIBUTE_ENTRIES
+        oben in der config) - dritte abwechselnde Wartebildschirm-Ansicht,
+        siehe waiting_mode in der Hauptschleife."""
+        cx = FIELD_X + (GRID_W * CELL) // 2
+        top = HUD_HEIGHT + 30
+
+        title = tribute_title_font.render(TRIBUTE_TITLE, True, (255, 220, 80))
+        screen.blit(title, title.get_rect(centerx=cx, top=top))
+
+        n = len(TRIBUTE_ENTRIES)
+        if n == 0:
+            return
+        col_w = (GRID_W * CELL) // n
+        img_top = top + title.get_height() + 30
+        img_max_w = col_w - 40
+        img_max_h = 220
+
+        for idx, (path, credit, url) in enumerate(TRIBUTE_ENTRIES):
+            col_cx = FIELD_X + col_w * idx + col_w // 2
+
+            img = load_scaled(path, img_max_w, img_max_h)
+            if img:
+                rect = img.get_rect(centerx=col_cx, top=img_top)
+                screen.blit(img, rect)
+
+            y = img_top + img_max_h + 16
+            for line in wrap_text(credit, tribute_caption_font, col_w - 20):
+                line_surf = tribute_caption_font.render(line, True, TEXT_COLOR)
+                screen.blit(line_surf, line_surf.get_rect(centerx=col_cx, top=y))
+                y += line_surf.get_height() + 4
+
+            y += 8
+            url_surf = tribute_url_font.render(url, True, DIM_TEXT_COLOR)
+            screen.blit(url_surf, url_surf.get_rect(centerx=col_cx, top=y))
+
+    def draw_greeting():
+        """Einzelnes dankeschoen (GREETING_IMAGE/GREETING_TEXT oben in der
+        config) - vierte abwechselnde Wartebildschirm-Ansicht, siehe
+        waiting_mode in der Hauptschleife."""
+        cx = FIELD_X + (GRID_W * CELL) // 2
+        y = HUD_HEIGHT + 40
+
+        img = load_scaled(GREETING_IMAGE, GRID_W * CELL - 160, 340)
+        if img:
+            rect = img.get_rect(centerx=cx, top=y)
+            screen.blit(img, rect)
+            y = rect.bottom + 30
+        else:
+            y += 30
+
+        for line in wrap_text(GREETING_TEXT, tribute_title_font, GRID_W * CELL - 80):
+            line_surf = tribute_title_font.render(line, True, (255, 220, 80))
+            screen.blit(line_surf, line_surf.get_rect(centerx=cx, top=y))
+            y += line_surf.get_height() + 6
+
     running = True
     while running:
         for event in pygame.event.get():
@@ -1217,12 +1325,23 @@ def pygame_loop():
             y = HUD_HEIGHT + gy * CELL
             pygame.draw.line(screen, GRID_LINE_COLOR, (FIELD_X, y), (FIELD_X + GRID_W * CELL, y))
 
-        # --- Wartebildschirm: scrolltext und highscore-liste wechseln sich ab,
-        # laeuft nur, solange auf spieler gewartet wird ---
+        # --- Wartebildschirm: scrolltext, highscore-liste und tribute-
+        # bildschirm wechseln sich ab, laeuft nur, solange auf spieler
+        # gewartet wird ---
         if state["phase"] == "waiting":
             if waiting_mode == "highscore":
                 draw_highscore(state["wins"], state["draws"], state["games_played"])
                 if time.monotonic() >= highscore_shown_until:
+                    waiting_mode = "tribute"
+                    tribute_shown_until = time.monotonic() + TRIBUTE_DURATION
+            elif waiting_mode == "tribute":
+                draw_tribute()
+                if time.monotonic() >= tribute_shown_until:
+                    waiting_mode = "greeting"
+                    greeting_shown_until = time.monotonic() + GREETING_DURATION
+            elif waiting_mode == "greeting":
+                draw_greeting()
+                if time.monotonic() >= greeting_shown_until:
                     waiting_mode = "scroll"
             else:
                 scroll_x -= SCROLL_SPEED
