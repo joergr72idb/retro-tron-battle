@@ -128,7 +128,7 @@ from datetime import datetime
 # =============================================================================
 # VERSION - increment on every content change (shown in console + window)
 # =============================================================================
-SERVER_BUILD = 9
+SERVER_BUILD = 10
 # =============================================================================
 
 # =============================================================================
@@ -268,7 +268,10 @@ GREETING_DURATION = 20  # seconds the thank-you screen stays up
 
 GRID_W = 50
 GRID_H = 30
-TICK_RATE = 8  # ticks/sec - keep modest, these are slow clients on real silicon
+TICK_RATE = 4  # ticks/sec = 250ms/tick - tuned so Meatloaf (~295ms) and CPC
+# (~500ms) round-trips cost fewer wrong-direction cells relative to Atari's
+# near-zero latency (~1.2 and ~2.0 ticks behind respectively, was ~2.4/~4.0
+# at the previous 125ms/8-tick setting) - see CLAUDE.md tick-latency notes
 
 CELL = 18             # pixel size of one grid cell in the display window
 HUD_HEIGHT = 120      # pixel height of the stats/status header

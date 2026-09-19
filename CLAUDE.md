@@ -362,6 +362,24 @@ server:
     above `TICK_RATE`'s 125 ms, and the game still works reliably
     after many games regardless - still an argument against changing
     `TICK_RATE` in response (see the takeaway above).
+  - **`TICK_RATE` changed 8 -> 4 (125ms -> 250ms/tick) on 2026-09-20,
+    revising the takeaway above:** discussed with the user - unlike
+    lowering it to accommodate WiC64's ~10x outlier (still not worth
+    it, see above), this is a moderate adjustment targeted at the two
+    platforms actually fielded at the event. `TICK_RATE` doesn't
+    change each platform's network round-trip time, but it does
+    change how many wrong-direction grid cells get travelled during
+    that fixed latency window - a real, spatial fairness effect, not
+    just cosmetic. At 250ms: Meatloaf's ~295ms drops from ~2.4 to
+    **~1.2 ticks** behind (nearly every tick gets a fresh input, close
+    to Atari's feel), CPC's ~500ms drops from ~4.4 to **~2.0 ticks**
+    behind. Trade-off: the whole board now moves at half the previous
+    speed for every platform, Atari included - possibly a wash or even
+    a plus for a public exhibition, since a slower-paced duel is
+    likely easier for a crowd around a projector to follow. Not yet
+    playtested at the new setting - if it feels too sluggish (or CPC
+    still feels outmatched), reconsider a value between 125ms and
+    250ms rather than reverting outright.
   - **First real-hardware crossplay smoke test (2026-09-19) —
     CORRECTION, not an actual gameplay test:** CPC/M4 vs. C64/Meatloaf,
     both on real hardware, ended with "draw (simultaneous crash)"
