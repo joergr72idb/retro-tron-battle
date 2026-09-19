@@ -12,7 +12,7 @@
 22 for i=1 to 40:print " ";:next i:print
 23 print "   retro tron battle -"
 24 print "   classic computing 2026"
-25 print "     commodore 64 edition - build 16"
+25 print "     commodore 64 edition - build 17"
 26 for i=1 to 40:print " ";:next i:print
 27 print chr$(146)
 28 print
@@ -46,7 +46,7 @@
 290 se=se+1:goto 270
 300 sn$=mid$(r$,ss,se-ss)
 310 gs=0
-320 if left$(r$,5)="start" then 340
+320 if left$(r$,5)="start" or left$(r$,5)="START" then 340
 330 print "waiting for opponent...":goto 400
 340 print "use joystick - port 2":gs=1
 400 rem ===== main loop =====
@@ -62,11 +62,11 @@
 490 gosub 2000:rem http get -> r$
 491 if r$="" then 560
 492 ec=0
-493 if left$(r$,3)="err" then 800
+493 if left$(r$,3)="err" or left$(r$,3)="ERR" then 800
 494 if gs=1 then 510
-495 if left$(r$,5)<>"start" then 510
+495 if left$(r$,5)<>"start" and left$(r$,5)<>"START" then 510
 496 print "use joystick - port 2":gs=1
-510 if left$(r$,3)<>"end" then 400
+510 if left$(r$,3)<>"end" and left$(r$,3)<>"END" then 400
 520 rem -- spiel zu ende: ergebnis zeigen, dann neustart --
 521 print "game over":print r$
 525 print "restarting..."

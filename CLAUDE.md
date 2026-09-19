@@ -128,6 +128,22 @@ zu erreichen:
 - **`GET#` char-für-char:** Erst das Byte verwenden, DANN `ST` prüfen
   (nicht umgekehrt) — sonst geht das letzte Byte vor Verbindungsende
   verloren.
+- **Hauptschleife prüfte `START`/`ERR`/`END` nur in Kleinschreibung —
+  Client blieb bei laufendem Spiel "stumm" (2026-09-20, vom Nutzer auf
+  echter Hardware bemerkt: keinerlei Anzeige beim Spielstart):**
+  Derselbe Bug wie beim WiC64-Client (siehe dort, "WiC64-Hauptschleife
+  pruefte START/END/ERR nur in Grossschreibung") — hier aber beim
+  eigentlich als stabil geltenden Meatloaf-Client. Der `/join`-Antwort-
+  Check (Zeile 160) akzeptierte von Anfang an `SESSION`/`session`
+  beidseitig, die Hauptschleifen-Checks auf `start`/`err`/`end` (Zeilen
+  320/493/495/510) aber nur Kleinschreibung — falls der Server (oder
+  irgendein Zwischenschritt) doch einmal Großschreibung durchlässt,
+  bleibt der Bildschirm bei "waiting for opponent..." stehen, obwohl
+  das Spiel laengst laeuft. **Fix:** alle vier Stellen akzeptieren jetzt
+  beide Schreibweisen, analog zum WiC64-Fix. **Lektion:** Beim
+  Uebertragen eines Fixes von einem Client auf einen strukturell
+  aehnlichen (hier: WiC64 → Meatloaf, beide C64/HTTP-Polling) immer
+  ALLE betroffenen Stellen mitziehen, nicht nur die zuerst gefundene.
 
 ### Schneider/Amstrad CPC + M4-Board
 
