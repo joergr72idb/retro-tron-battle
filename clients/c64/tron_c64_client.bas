@@ -12,7 +12,7 @@
 22 for i=1 to 40:print " ";:next i:print
 23 print "   retro tron battle -"
 24 print "   classic computing 2026"
-25 print "     commodore 64 edition - build 17"
+25 print "     commodore 64 edition - build 18"
 26 for i=1 to 40:print " ";:next i:print
 27 print chr$(146)
 28 print
@@ -45,8 +45,13 @@
 280 if mid$(r$,se,1)=chr$(10) or mid$(r$,se,1)=chr$(13) then 300
 290 se=se+1:goto 270
 300 sn$=mid$(r$,ss,se-ss)
+301 rem -- r$ still starts with "session <id>" here - rs$ is whatever
+302 rem    came after that line, which is what actually needs checking
+303 rem    below (a second player can get an instant "start ..." embedded
+304 rem    right in the join response, not just "wait")
+305 rs$="":if se<=len(r$) then rs$=mid$(r$,se+1,len(r$)-se)
 310 gs=0
-320 if left$(r$,5)="start" or left$(r$,5)="START" then 340
+320 if left$(rs$,5)="start" or left$(rs$,5)="START" then 340
 330 print "waiting for opponent...":goto 400
 340 print "use joystick - port 2":gs=1
 400 rem ===== main loop =====

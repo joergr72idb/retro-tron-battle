@@ -17,7 +17,7 @@
 70 for i=1 to 40:print" ";:next i:print
 80 print"   RETRO TRON BATTLE -"
 90 print"   CLASSIC COMPUTING 2026"
-100 print"     COMMODORE 64 / WIC64 EDITION - BUILD 8"
+100 print"     COMMODORE 64 / WIC64 EDITION - BUILD 9"
 110 for i=1 to 40:print" ";:next i:print
 120 print chr$(146):print
 130 ho$="192.168.17.138":rem <-- edit: server ip
@@ -50,8 +50,13 @@
 330 ifmid$(r$,se,1)=chr$(10)ormid$(r$,se,1)=chr$(13)then350
 340 se=se+1:goto320
 350 sn$=mid$(r$,ss,se-ss)
+355 rem -- r$ still starts with "session <id>" here - rs$ is whatever
+356 rem    came AFTER that line, which is what actually needs checking
+357 rem    below (a second player can get an instant "start ..." embedded
+358 rem    right in the join response, not just "wait")
+359 rs$="":ifse<=len(r$)thenrs$=mid$(r$,se+1,len(r$)-se)
 360 gs=0
-370 ifleft$(r$,5)="START"orleft$(r$,5)="start"then400
+370 ifleft$(rs$,5)="START"orleft$(rs$,5)="start"then400
 380 print"waiting for opponent...":goto500
 400 print"use joystick - port 2":gs=1
 500 rem ===== main loop =====

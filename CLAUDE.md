@@ -215,6 +215,31 @@ server:
   ("andi6510", see the disk label of the original `fotofix.d64`) — the
   file now lives under `clients/c64/wic64-driver/` in the repo, see
   the README there for details/credit.
+- **"USE JOYSTICK" never printed for a second player who joined via
+  HTTP and got matched instantly (2026-09-20, found while porting this
+  protocol to a sibling multi-game project, not yet observed as a
+  player complaint on real hardware here):** the `/join` response body
+  is `"SESSION <id>\n"` followed by whatever was already queued for
+  that player — for a second player who gets paired immediately, that
+  queued content is very commonly `START ...` itself, not `WAIT`, since
+  `run_game()` already sent it before the 50ms post-`/join` sleep
+  elapses. The client's "did we get a START" check (`ifleft$(r$,5)=
+  "START"orleft$(r$,5)="start"then400`) tested this against `r$` as a
+  whole, which at that point still starts with `"SESSION ..."` — so the
+  check could never actually match, and the client fell through to
+  printing `"waiting for opponent..."` even though the match had, in
+  fact, already started. Steering itself was never affected (the main
+  loop's joystick-read/`/tick` send doesn't depend on this flag), only
+  the one status line and the `gs` flag (which then also never gets set
+  to 1 later, since `START` isn't re-sent on a later `/tick` once
+  already consumed here). **Fix:** extract whatever comes after the
+  `"session <id>"` line into its own `rs$` right after `sn$` is
+  extracted, and check `rs$` instead of `r$` for the `START` prefix —
+  `tron_c64_wic64_client.bas`, build 9. **Same underlying mistake also
+  affected the Meatloaf and CPC clients** (they have the identical
+  `left$(r$,5)="start"`-against-the-whole-response pattern right after
+  session-id extraction) — ported the identical fix to both on
+  2026-09-20, see the entry further below.
 - **Cause found for the "`/join` looks ok, `/tick` consistently 'ERR
   UNKNOWN SESSION'" bug (2026-09-11, not yet verified on real
   hardware):** the definitely-working reference example `fotofix.prg`
@@ -303,6 +328,24 @@ server:
   past game end. **Fix:** the `START`/`END`/`ERR` checks in the main
   loop now accept both cases, mirroring the `SESSION`/`session`
   pattern already in place for the join response.
+- **Instant-START join-response fix (see the entry further above)
+  ported to Meatloaf and CPC (2026-09-20):** the same
+  `left$(r$,5)="start"`-against-the-whole-response bug (found on the
+  WiC64 client while porting the protocol to a sibling project) was
+  confirmed present, byte-for-byte identical, in both
+  `tron_c64_client.bas` (Meatloaf, build 17) and
+  `tron_cpc_client.bas` (CPC, build 6) — both extract the session ID
+  from `r$` with the exact same `ss`/`se` loop, then immediately check
+  `START` against `r$` itself instead of what comes after the session
+  line. **Fix, mirroring the WiC64 build-9 change exactly:** extract
+  `rs$` (whatever follows the `"session <id>"` line) right after
+  `sn$`, check `rs$` instead of `r$` for the `START` prefix. Meatloaf
+  bumped to build 18, CPC to build 7. `client.prg` (Meatloaf) rebuilt
+  via `petcat -w2`; the CPC client still needs the WinAPE/M4 upload
+  step done manually. Not yet re-verified on real hardware — next
+  hardware test should specifically try pairing two players who join
+  back-to-back (the failure only shows for the second player when the
+  match starts before their post-`/join` sleep elapses).
 - **"`/join` ok, `/tick` = 'ERR UNKNOWN SESSION'" bug:** see the fix
   entry further above (uppercase URLs + missing prefix check on the
   join response) — still to be verified on hardware.

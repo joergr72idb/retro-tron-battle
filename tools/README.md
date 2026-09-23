@@ -15,6 +15,12 @@ useful as a starting point for similar diagnostics on a new platform:
 - `cpc_joystick_test.bas` - standalone joystick test for Schneider CPC
   (`JOY(0)`, raw + decoded)
 - `meatloaf_netztest.bas` - isolated Meatloaf HTTP test
+- `meatloaf_latency_probe.bas` - compares per-tick fresh open/close
+  (device 8, sec.addr. 3, today's client method) against one open +
+  reused channel (sec.addr. 2, Meatloaf's full HTTP client protocol)
+  over N requests each, timed via the jiffy clock - written to check
+  whether connection reuse is worth adopting for lower `/tick` latency
+  before committing to a protocol change (see `CLAUDE.md`)
 
 ## External tools (no longer bundled in the repo)
 
