@@ -116,6 +116,7 @@ import csv
 import ftplib
 import math
 import os
+import random
 import sys
 import threading
 import time
@@ -261,6 +262,25 @@ TICK_RATE = 4  # ticks/sec = 250ms/tick - tuned so Meatloaf (~295ms) and CPC
 # (~500ms) round-trips cost fewer wrong-direction cells relative to Atari's
 # near-zero latency (~1.2 and ~2.0 ticks behind respectively, was ~2.4/~4.0
 # at the previous 125ms/8-tick setting) - see CLAUDE.md tick-latency notes
+
+# =============================================================================
+# ATARI INPUT-LATENCY EQUALIZER - Atari/FujiNet is the only client on a
+# persistent raw TCP connection, so a direction change reaches the server
+# essentially instantly. Meatloaf and CPC/M4 only get a fresh direction
+# through roughly every 1-2 ticks, because their HTTP-poll round-trip
+# (~300ms/~550ms, see the tick-latency measurements in CLAUDE.md) is itself
+# close to or above TICK_RATE's 250ms. Server-side only, no Atari client
+# change needed: every MOVE from an Atari player is held back by a random
+# delay drawn from [ATARI_LATENCY_MIN, ATARI_LATENCY_MAX] before it's
+# actually applied to that player's direction, so Atari's steering "feels"
+# roughly as laggy as the other two. Tune the range or flip the switch off
+# based on playtesting - these starting values are just a first guess, not
+# yet verified on real hardware.
+# =============================================================================
+ATARI_LATENCY_EQUALIZER = True  # <-- EDIT: False = off, Atari reacts instantly again
+ATARI_LATENCY_MIN = 0.25        # <-- EDIT: seconds, minimum artificial delay per move
+ATARI_LATENCY_MAX = 0.45        # <-- EDIT: seconds, maximum artificial delay per move
+# =============================================================================
 
 CELL = 18             # pixel size of one grid cell in the display window
 HUD_HEIGHT = 120      # pixel height of the stats/status header
@@ -413,6 +433,8 @@ class Player:
     pin: str = ""
     photo_task: object = field(default=None, repr=False)  # asyncio.Future from run_in_executor
     inbuf: object = field(default_factory=lambda: LineBuffer(), repr=False)
+    pending_moves: list = field(default_factory=list, repr=False)  # [(apply_at, direction), ...]
+    # for ATARI_LATENCY_EQUALIZER, see drain_moves() below
 
 
 class Stats:
@@ -863,11 +885,36 @@ async def handle_http_connection(reader: asyncio.StreamReader, writer: asyncio.S
             pass
 
 
+def _apply_direction(p: "Player", d: str):
+    """Actually sets p.direction from a MOVE command (reverse-of-current
+    check + logging) - split out of drain_moves() so ATARI_LATENCY_EQUALIZER
+    below can call it late, once a delayed Atari move comes due, instead of
+    right when the MOVE line is read."""
+    if d == OPPOSITE.get(p.direction):
+        log(f"[move] {p.platform}/{p.name}: {d} ignored (reverse of {p.direction})")
+    elif d != p.direction:
+        log(f"[move] {p.platform}/{p.name}: {p.direction} -> {d}")
+        p.direction = d
+    # else: client is resending the same direction (normal for
+    # HTTP-polling clients, e.g.) - don't log it, or it'd flood
+    # the file with no new information.
+
+
 async def drain_moves(players):
     """Non-blockingly reads and applies any pending MOVE/BYE commands for
     each player. Used both during the countdown (so direction changes
     aren't lost) and in the normal game tick, so both spots behave
     exactly the same."""
+    now = time.monotonic()
+    for p in players:
+        if p.pending_moves:
+            due = [m for m in p.pending_moves if m[0] <= now]
+            if due:
+                due.sort(key=lambda m: m[0])
+                p.pending_moves = [m for m in p.pending_moves if m[0] > now]
+                for _, d in due:
+                    _apply_direction(p, d)
+
     for p in players:
         try:
             data = await asyncio.wait_for(p.reader.read(256), timeout=0.01)
@@ -890,14 +937,11 @@ async def drain_moves(players):
                 tokens = line.split()
                 if len(tokens) > 1 and tokens[1] in DIRS:
                     d = tokens[1]
-                    if d == OPPOSITE.get(p.direction):
-                        log(f"[move] {p.platform}/{p.name}: {d} ignored (reverse of {p.direction})")
-                    elif d != p.direction:
-                        log(f"[move] {p.platform}/{p.name}: {p.direction} -> {d}")
-                        p.direction = d
-                    # else: client is resending the same direction (normal for
-                    # HTTP-polling clients, e.g.) - don't log it, or it'd flood
-                    # the file with no new information.
+                    if ATARI_LATENCY_EQUALIZER and p.platform == "ATARI":
+                        delay = random.uniform(ATARI_LATENCY_MIN, ATARI_LATENCY_MAX)
+                        p.pending_moves.append((time.monotonic() + delay, d))
+                    else:
+                        _apply_direction(p, d)
             elif line == "BYE":
                 p.alive = False
 

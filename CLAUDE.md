@@ -510,6 +510,28 @@ radically simplified:
   (see the lessons above) — and a broken digitization screen is worse
   at an exhibition than no digitization screen at all.
 
+## Atari input-latency equalizer (2026-09-23)
+
+Atari/FujiNet is the only client on a persistent raw TCP connection —
+its `MOVE` commands reach the server essentially instantly, while
+Meatloaf (~300ms/tick) and CPC/M4 (~550ms/tick) only get a fresh
+direction through roughly every 1-2 ticks at `TICK_RATE=4` (see the
+tick-latency measurements in the WiC64 section above). That's a real
+reflexes advantage for Atari in cross-platform matches. **Fix, entirely
+server-side, no Atari client change:** `drain_moves()` in
+`server/tron_server.py` now holds back every Atari `MOVE` by a random
+delay drawn from `[ATARI_LATENCY_MIN, ATARI_LATENCY_MAX]` (queued in
+the new `Player.pending_moves`, applied later via the extracted
+`_apply_direction()` helper) instead of setting `p.direction`
+immediately — Meatloaf and CPC are unaffected, their real network
+latency already does this for them. `ATARI_LATENCY_EQUALIZER = False`
+switches it off entirely (Atari reacts instantly again); the two
+`_MIN`/`_MAX` constants are the tunable range, currently `0.25`/`0.45`
+seconds as a first guess. **Not yet playtested** — the next hardware
+session should specifically check whether Atari still feels
+noticeably faster than Meatloaf/CPC, and adjust the range (or turn it
+off again) based on that.
+
 ## General, cross-platform patterns
 
 1. **Reserved variable names are a recurring trap.** ALWAYS check
