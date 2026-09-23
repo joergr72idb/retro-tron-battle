@@ -255,17 +255,6 @@ TRIBUTE_ENTRIES = [  # (image, credit text, url to display) - <-- EDIT for your 
 ]
 # =============================================================================
 
-# =============================================================================
-# FOTOFIX THANKS - FOURTH WAITING-SCREEN VIEW (AFTER THE TRIBUTE SCREEN),
-# a single thank-you - e.g. to a person/project that doesn't need a
-# slot in the TRIBUTE_ENTRIES list above (currently: the FOTOFIX
-# project, see clients/c64/wic64-driver/README.md)
-# =============================================================================
-GREETING_IMAGE = os.path.join(BASE_DIR, "assets/logos/greetings/greeting.jpg")  # <-- EDIT
-GREETING_TEXT = "THANKS A LOT!"  # <-- EDIT
-GREETING_DURATION = 20  # seconds the thank-you screen stays up
-# =============================================================================
-
 GRID_W = 50
 GRID_H = 30
 TICK_RATE = 4  # ticks/sec = 250ms/tick - tuned so Meatloaf (~295ms) and CPC
@@ -1100,13 +1089,12 @@ def pygame_loop():
     # The waiting screen cycles through, for as long as the server is
     # waiting for players: scroll text (SCROLL_LOOPS_BEFORE_HIGHSCORE full
     # loops) -> high-score list (HIGHSCORE_DURATION seconds) -> tribute
-    # screen (TRIBUTE_DURATION seconds) -> fotofix thanks (GREETING_DURATION
-    # seconds) -> back to scroll text, etc. (see config above).
+    # screen (TRIBUTE_DURATION seconds) -> back to scroll text, etc. (see
+    # config above).
     waiting_mode = "scroll"
     scroll_loop_count = 0
     highscore_shown_until = 0.0
     tribute_shown_until = 0.0
-    greeting_shown_until = 0.0
 
     # Cache loaded+scaled images by (path, max_w, max_h), so we don't
     # re-decode the same JPEG/PNG on every single frame.
@@ -1288,26 +1276,6 @@ def pygame_loop():
                 screen.blit(line_surf, line_surf.get_rect(centerx=col_cx, top=y))
                 y += line_surf.get_height() + 2
 
-    def draw_greeting():
-        """A single thank-you (GREETING_IMAGE/GREETING_TEXT in the config
-        above) - fourth alternating waiting-screen view, see waiting_mode
-        in the main loop."""
-        cx = FIELD_X + (GRID_W * CELL) // 2
-        y = HUD_HEIGHT + 40
-
-        img = load_scaled(GREETING_IMAGE, GRID_W * CELL - 160, 340)
-        if img:
-            rect = img.get_rect(centerx=cx, top=y)
-            screen.blit(img, rect)
-            y = rect.bottom + 30
-        else:
-            y += 30
-
-        for line in wrap_text(GREETING_TEXT, tribute_title_font, GRID_W * CELL - 80):
-            line_surf = tribute_title_font.render(line, True, (255, 220, 80))
-            screen.blit(line_surf, line_surf.get_rect(centerx=cx, top=y))
-            y += line_surf.get_height() + 6
-
     running = True
     while running:
         for event in pygame.event.get():
@@ -1377,11 +1345,6 @@ def pygame_loop():
             elif waiting_mode == "tribute":
                 draw_tribute()
                 if time.monotonic() >= tribute_shown_until:
-                    waiting_mode = "greeting"
-                    greeting_shown_until = time.monotonic() + GREETING_DURATION
-            elif waiting_mode == "greeting":
-                draw_greeting()
-                if time.monotonic() >= greeting_shown_until:
                     waiting_mode = "scroll"
             else:
                 scroll_x -= SCROLL_SPEED
