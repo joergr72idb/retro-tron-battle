@@ -129,7 +129,7 @@ from datetime import datetime
 # =============================================================================
 # VERSION - increment on every content change (shown in console + window)
 # =============================================================================
-SERVER_BUILD = 12
+SERVER_BUILD = 13
 # =============================================================================
 
 # =============================================================================
@@ -182,6 +182,17 @@ CSV_FIELDNAMES = ["timestamp", "p1_platform", "p1_name", "p2_platform", "p2_name
 # commands (see drain_moves()) and a searchable header per game start.
 LOG_FILE_PATH = os.path.join(BASE_DIR, "tron_server.log")  # <-- EDIT: path to the log file
 # =============================================================================
+
+# ANSI color for steering ([move]) lines on the console, e.g. for a second
+# monitor showing this terminal (VS Code's integrated terminal renders
+# these) next to the pygame playfield - makes steering easy to spot among
+# the other log lines. Never written to LOG_FILE_PATH, just the console.
+# <-- EDIT: None disables coloring; other options: ANSI_CYAN, ANSI_GREEN
+ANSI_YELLOW = "\033[93m"
+ANSI_CYAN = "\033[96m"
+ANSI_GREEN = "\033[92m"
+ANSI_RESET = "\033[0m"
+MOVE_LOG_COLOR = ANSI_YELLOW
 
 # =============================================================================
 # EVENT PHOTO / LOGO CONFIGURATION - ADAPT THIS BLOCK FOR YOUR EVENT
@@ -407,11 +418,17 @@ def event_logo_path():
     return None
 
 
-def log(msg: str) -> None:
+def log(msg: str, color: str | None = None) -> None:
     """Like print(), additionally appends msg to LOG_FILE_PATH (see config
     above). File-access errors should never abort the game - worst case
-    the message just ends up on the console only."""
-    print(msg)
+    the message just ends up on the console only. color wraps the
+    CONSOLE copy only (e.g. MOVE_LOG_COLOR) in an ANSI escape - skipped
+    when stdout isn't a real terminal (e.g. redirected to a file), and
+    the log file always gets the plain, colorless text either way."""
+    if color and sys.stdout.isatty():
+        print(f"{color}{msg}{ANSI_RESET}")
+    else:
+        print(msg)
     try:
         with open(LOG_FILE_PATH, "a", encoding="utf-8") as f:
             f.write(msg + "\n")
@@ -891,9 +908,10 @@ def _apply_direction(p: "Player", d: str):
     below can call it late, once a delayed Atari move comes due, instead of
     right when the MOVE line is read."""
     if d == OPPOSITE.get(p.direction):
-        log(f"[move] {p.platform}/{p.name}: {d} ignored (reverse of {p.direction})")
+        log(f"[move] {p.platform}/{p.name}: {d} ignored (reverse of {p.direction})",
+            color=MOVE_LOG_COLOR)
     elif d != p.direction:
-        log(f"[move] {p.platform}/{p.name}: {p.direction} -> {d}")
+        log(f"[move] {p.platform}/{p.name}: {p.direction} -> {d}", color=MOVE_LOG_COLOR)
         p.direction = d
     # else: client is resending the same direction (normal for
     # HTTP-polling clients, e.g.) - don't log it, or it'd flood
