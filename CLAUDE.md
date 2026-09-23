@@ -849,7 +849,13 @@ PIN `MUSTER`, instead of setting up your own test images.
 
 ## Current status (see also git log for details)
 
-- **Server**: stable, tested in production use over many games.
+- **Server**: stable, tested in production use over many games. Two
+  new, not-yet-playtested changes from 2026-09-23: the fourth
+  waiting-screen view (thank-you) was removed, and a
+  server-side Atari input-latency equalizer was added
+  (`ATARI_LATENCY_EQUALIZER`, see the "Atari input-latency equalizer"
+  section above) - next hardware session should specifically check
+  both.
 - **All four clients** (Atari, C64/Meatloaf, C64/WiC64, CPC): radically
   simplified on the UI side on 2026-09-12 — ASCII-art display,
   terminal typing effect and MCP storyline removed, see the "UI
@@ -857,9 +863,18 @@ PIN `MUSTER`, instead of setting up your own test images.
   CPC/M4 re-verified on real hardware after the simplification on
   2026-09-19 (see directly below); Atari and C64/WiC64 still have
   that ahead of them.
+- **All three HTTP-polling clients (Meatloaf, WiC64, CPC)**: a further
+  join-response bug ("USE JOYSTICK"/"use joystick" never printed for a
+  second player matched instantly, see the WiC64 lessons section
+  above) was found and fixed on 2026-09-20/2026-09-23 (Meatloaf build
+  18, WiC64 build 9, CPC build 7) - **not yet re-verified on real
+  hardware**, next hardware test should specifically pair two players
+  joining back-to-back.
 - **Atari client**: stable so far (before the simplification).
   Confirmed on 2026-09-20 in several real, steered cross-platform
-  matches against the CPC client (see below).
+  matches against the CPC client (see below) - that test predates the
+  2026-09-23 server-side input-latency equalizer, so steering "feel"
+  should be re-checked against Meatloaf/CPC now that it's active.
 - **C64 client (Meatloaf)**: session-mismatch bug (unchecked join
   response) found and fixed on real hardware on 2026-09-12.
   Re-verified on real hardware on 2026-09-19 (`/tick` latency
@@ -868,7 +883,9 @@ PIN `MUSTER`, instead of setting up your own test images.
   ("main loop only checked START/ERR/END in lowercase", see the
   Meatloaf section above) confirmed the same day in several real,
   steered cross-platform matches against the CPC client - "USE
-  JOYSTICK" now shows up reliably.
+  JOYSTICK" now shows up reliably. The instant-START join-response fix
+  (build 18, see bullet above) still needs its own hardware
+  verification.
 - **CPC client**: stable so far (before the simplification); got the
   same join-response fix as the Meatloaf client as a precaution.
   Verified on real hardware after the simplification on 2026-09-19
@@ -878,6 +895,8 @@ PIN `MUSTER`, instead of setting up your own test images.
   results alternated between both sides, no one-sided disadvantage
   apparent despite the differing `/tick` latency. See "First REAL
   hardware crossplay test with steering" in the WiC64 section above.
+  The instant-START join-response fix (build 7, see bullet above)
+  still needs its own hardware verification.
 - **C64 client (WiC64)**: experimental, no physical hardware available
   (see "Ideas for later"/test checklist). The game connection
   (`/join`/`/tick`) had a bug (URL uppercase + missing response
