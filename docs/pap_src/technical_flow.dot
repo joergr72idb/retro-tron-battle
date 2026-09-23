@@ -1,0 +1,75 @@
+digraph technical_flow {
+  rankdir=TB;
+  bgcolor="white";
+  fontname="Helvetica";
+  labelloc="t";
+  fontsize=20;
+  label="Retro Tron Battle — Server Logic (PAP)\n\n";
+  node [fontname="Helvetica", fontsize=11, margin="0.15,0.1"];
+  edge [fontname="Helvetica", fontsize=9];
+  nodesep=0.45;
+  ranksep=0.3;
+
+  start [label="START\nserver boots,\nlistens on TCP :6502\nand HTTP :8080", shape=box, style="rounded,filled", fillcolor="#dbe7f7"];
+
+  method_dec [label="Can the client's network\nadd-on hold a persistent\nTCP socket from BASIC?", shape=diamond, style=filled, fillcolor="#dff2e1"];
+
+  tcp_hello [label="TCP path (Atari/FujiNet):\nHELLO <PLATFORM> <NAME> [PIN]\non a socket that stays open\nfor the whole match", shape=parallelogram, style=filled, fillcolor="#fdf1cf"];
+
+  http_join [label="HTTP-poll path (Meatloaf, M4):\nGET /join/<platform>/<name>/<pin>\n→ \"SESSION <id>\" + WAIT/START", shape=parallelogram, style=filled, fillcolor="#fdf1cf"];
+
+  pair_dec [label="Second player\nalready waiting?", shape=diamond, style=filled, fillcolor="#dff2e1"];
+  enqueue [label="Register as the waiting\nplayer, return WAIT\n(HTTP: client keeps polling\nGET /tick; TCP: socket read\njust blocks)", shape=parallelogram, style=filled, fillcolor="#fdf1cf"];
+
+  rungame [label="run_game()\nshared by both paths", shape=box, peripheries=2, style=filled, fillcolor="#ffffff"];
+
+  countdown [label="Send START to both clients,\ncountdown 3-2-1 on screen\n(direction changes already\naccepted, nobody moves yet)", shape=box, style=filled, fillcolor="#ffffff"];
+
+  drain [label="drain_moves(): collect each\nplayer's latest direction\n\nTCP: read straight off the\nopen socket\nHTTP: whatever the last\n/tick poll delivered\n\nAtari extra, if enabled: hold\nthe move back a random delay\n(ATARI_LATENCY_EQUALIZER)\nbefore it takes effect", shape=box, style=filled, fillcolor="#ffffff"];
+
+  tick [label="One tick (every 1/TICK_RATE\nsec.): advance both players,\ncheck wall / own trail /\nopponent's trail", shape=box, style=filled, fillcolor="#ffffff"];
+
+  alive_dec [label="Both players\nstill alive?", shape=diamond, style=filled, fillcolor="#dff2e1"];
+
+  outcome_dec [label="Exactly one\nplayer alive?", shape=diamond, style=filled, fillcolor="#dff2e1"];
+
+  send_win [label="Send END WIN <platform> <name>\n+ STATS to both clients", shape=parallelogram, style=filled, fillcolor="#fdf1cf"];
+  send_draw [label="Send END DRAW\n+ STATS to both clients", shape=parallelogram, style=filled, fillcolor="#fdf1cf"];
+
+  record [label="Append result to\ntron_results.csv,\nupdate on-screen totals", shape=box, style=filled, fillcolor="#ffffff"];
+
+  back_wait [label="Return to waiting state:\nscroll text / high-score list /\ntribute screen keep rotating", shape=box, style=filled, fillcolor="#ffffff"];
+
+  end_ [label="back to accepting\nnew connections\n(loops to START)", shape=box, style="rounded,filled", fillcolor="#dbe7f7"];
+
+  start -> method_dec;
+  method_dec -> tcp_hello [label="yes (Atari)"];
+  method_dec -> http_join [label="no (Meatloaf, CPC)"];
+  tcp_hello -> pair_dec;
+  http_join -> pair_dec;
+  pair_dec -> enqueue [label="no"];
+  enqueue -> pair_dec [label="  until paired", tailport=w, headport=w];
+  pair_dec -> rungame [label="yes"];
+  rungame -> countdown -> drain -> tick -> alive_dec;
+  alive_dec -> drain [label="yes", tailport=e, headport=e];
+  alive_dec -> outcome_dec [label="no"];
+  outcome_dec -> send_win [label="yes"];
+  outcome_dec -> send_draw [label="no"];
+  send_win -> record;
+  send_draw -> record;
+  record -> back_wait -> end_;
+
+  subgraph cluster_legend {
+    label="PAP symbols";
+    fontsize=11;
+    style=filled;
+    fillcolor="#f7f7f7";
+    color="#999999";
+    l_term [label="Start / End", shape=box, style="rounded,filled", fillcolor="#dbe7f7", fontsize=10, width=1.5, height=0.4];
+    l_proc [label="Process step", shape=box, fillcolor="#ffffff", style=filled, fontsize=10, width=1.5, height=0.4];
+    l_sub  [label="Shared subroutine", shape=box, peripheries=2, fillcolor="#ffffff", style=filled, fontsize=10, width=1.5, height=0.4];
+    l_io   [label="Network message /\nscreen output", shape=parallelogram, style=filled, fillcolor="#fdf1cf", fontsize=10, width=1.5, height=0.4];
+    l_dec  [label="Decision", shape=diamond, style=filled, fillcolor="#dff2e1", fontsize=10, width=1.5, height=0.5];
+    l_term -> l_proc -> l_sub -> l_io -> l_dec [style=invis];
+  }
+}

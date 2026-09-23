@@ -47,7 +47,9 @@ bots/       Automated test bots (Bash/PowerShell) to play without
 tools/      Diagnostic/test programs per platform, plus links to
             external third-party tools (d64-inspector, C64 TrueType
             font) - see README there
-docs/       PDF documentation (protocol, extending to further platforms)
+docs/       PDF documentation (protocol, extending to further platforms,
+            hardware test checklist, PAP flowcharts for explaining the
+            game to visitors)
 disk-images/ Ready-made reference disk images (Atari/CPC/C64) for
             setting up real hardware, see README there
 archive/    Abandoned approaches, kept for reference
