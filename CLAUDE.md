@@ -215,6 +215,7 @@ server:
   ("andi6510", see the disk label of the original `fotofix.d64`) — the
   file now lives under `clients/c64/wic64-driver/` in the repo, see
   the README there for details/credit.
+- Hans has developed the fotofix idea - many thanks from here!
 - **"USE JOYSTICK" never printed for a second player who joined via
   HTTP and got matched instantly (2026-09-20, found while porting this
   protocol to a sibling multi-game project, not yet observed as a
@@ -849,13 +850,11 @@ PIN `MUSTER`, instead of setting up your own test images.
 
 ## Current status (see also git log for details)
 
-- **Server**: stable, tested in production use over many games. Two
-  new, not-yet-playtested changes from 2026-09-23: the fourth
-  waiting-screen view (thank-you) was removed, and a
-  server-side Atari input-latency equalizer was added
-  (`ATARI_LATENCY_EQUALIZER`, see the "Atari input-latency equalizer"
-  section above) - next hardware session should specifically check
-  both.
+- **Server**: stable, tested in production use over many games. One
+  new, not-yet-playtested change from 2026-09-23: a server-side Atari
+  input-latency equalizer was added (`ATARI_LATENCY_EQUALIZER`, see the
+  "Atari input-latency equalizer" section above) - next hardware
+  session should specifically check it.
 - **All four clients** (Atari, C64/Meatloaf, C64/WiC64, CPC): radically
   simplified on the UI side on 2026-09-12 — ASCII-art display,
   terminal typing effect and MCP storyline removed, see the "UI

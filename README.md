@@ -71,6 +71,10 @@ speed) are clearly marked blocks at the top of
 `server/tron_server.py` — edit them directly there, no separate
 config file.
 
+## Thanks
+
+Hans has developed the fotofix idea - many thanks from here!
+
 ## AI notice
 
 This project was developed with AI assistance (Claude) — the server
