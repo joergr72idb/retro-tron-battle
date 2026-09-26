@@ -284,9 +284,9 @@ TICK_RATE = 4  # ticks/sec = 250ms/tick - tuned so Meatloaf (~295ms) and CPC
 # change needed: every MOVE from an Atari player is held back by a random
 # delay drawn from [ATARI_LATENCY_MIN, ATARI_LATENCY_MAX] before it's
 # actually applied to that player's direction, so Atari's steering "feels"
-# roughly as laggy as the other two. Tune the range or flip the switch off
-# based on playtesting - these starting values are just a first guess, not
-# yet verified on real hardware.
+# roughly as laggy as the other two. Playtested on real hardware
+# 2026-09-26 (Atari vs. Meatloaf and vs. CPC): steering feels equal with
+# these values.
 # =============================================================================
 ATARI_LATENCY_EQUALIZER = True  # <-- EDIT: False = off, Atari reacts instantly again
 ATARI_LATENCY_MIN = 0.25        # <-- EDIT: seconds, minimum artificial delay per move

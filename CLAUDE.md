@@ -420,10 +420,11 @@ server:
     behind. Trade-off: the whole board now moves at half the previous
     speed for every platform, Atari included - possibly a wash or even
     a plus for a public exhibition, since a slower-paced duel is
-    likely easier for a crowd around a projector to follow. Not yet
-    playtested at the new setting - if it feels too sluggish (or CPC
-    still feels outmatched), reconsider a value between 125ms and
-    250ms rather than reverting outright.
+    likely easier for a crowd around a projector to follow.
+    **Playtested on real hardware 2026-09-26** (together with the
+    Atari input-latency equalizer, see below): Atari vs. C64/Meatloaf
+    and Atari vs. CPC/M4, steering felt equal on all clients - keep
+    250ms.
   - **First real-hardware crossplay smoke test (2026-09-19) —
     CORRECTION, not an actual gameplay test:** CPC/M4 vs. C64/Meatloaf,
     both on real hardware, ended with "draw (simultaneous crash)"
@@ -528,10 +529,10 @@ immediately — Meatloaf and CPC are unaffected, their real network
 latency already does this for them. `ATARI_LATENCY_EQUALIZER = False`
 switches it off entirely (Atari reacts instantly again); the two
 `_MIN`/`_MAX` constants are the tunable range, currently `0.25`/`0.45`
-seconds as a first guess. **Not yet playtested** — the next hardware
-session should specifically check whether Atari still feels
-noticeably faster than Meatloaf/CPC, and adjust the range (or turn it
-off again) based on that.
+seconds. **Playtested on real hardware 2026-09-26:** several battles
+Atari vs. C64/Meatloaf and Atari vs. CPC/M4 - steering now feels equal
+on all clients, so the first-guess range stays as is. (C64/WiC64 not
+part of that test, no hardware.)
 
 ## General, cross-platform patterns
 
@@ -850,11 +851,11 @@ PIN `MUSTER`, instead of setting up your own test images.
 
 ## Current status (see also git log for details)
 
-- **Server**: stable, tested in production use over many games. One
-  new, not-yet-playtested change from 2026-09-23: a server-side Atari
-  input-latency equalizer was added (`ATARI_LATENCY_EQUALIZER`, see the
-  "Atari input-latency equalizer" section above) - next hardware
-  session should specifically check it.
+- **Server**: stable, tested in production use over many games. The
+  server-side Atari input-latency equalizer (`ATARI_LATENCY_EQUALIZER`,
+  added 2026-09-23, see the "Atari input-latency equalizer" section
+  above) was playtested on real hardware on 2026-09-26 (Atari vs.
+  Meatloaf and vs. CPC): steering feels equal on all clients.
 - **All four clients** (Atari, C64/Meatloaf, C64/WiC64, CPC): radically
   simplified on the UI side on 2026-09-12 — ASCII-art display,
   terminal typing effect and MCP storyline removed, see the "UI
@@ -871,9 +872,9 @@ PIN `MUSTER`, instead of setting up your own test images.
   joining back-to-back.
 - **Atari client**: stable so far (before the simplification).
   Confirmed on 2026-09-20 in several real, steered cross-platform
-  matches against the CPC client (see below) - that test predates the
-  2026-09-23 server-side input-latency equalizer, so steering "feel"
-  should be re-checked against Meatloaf/CPC now that it's active.
+  matches against the CPC client (see below). Re-checked with the
+  server-side input-latency equalizer active on 2026-09-26 against
+  both Meatloaf and CPC - steering feel now equal.
 - **C64 client (Meatloaf)**: session-mismatch bug (unchecked join
   response) found and fixed on real hardware on 2026-09-12.
   Re-verified on real hardware on 2026-09-19 (`/tick` latency
