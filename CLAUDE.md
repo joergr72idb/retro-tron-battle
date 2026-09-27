@@ -164,6 +164,14 @@ server:
   M4 web interface. The eventual solution was **WinAPE's "Auto Type"**
   (types a text file in character by character, exactly like the
   Atari emulator paste) — this sidesteps the header problem entirely.
+- **Joystick moves end up in the keyboard buffer** (seen on real
+  hardware 2026-09-26, build 6): the CPC joystick is part of the key
+  matrix, so the firmware queues arrow characters for every stick
+  movement even though the game reads it via `JOY(0)`. After a match,
+  `RUN` jumped back to `INPUT PN$` and the leftover `↑→↑→↑` showed up
+  in the PIN prompt. Fix (build 8): `WHILE INKEY$<>"":WEND` right
+  before the prompt. Deliberately not `CLEAR INPUT`, which only exists
+  in BASIC 1.1 (664/6128) and would be a syntax error on a 464.
 
 ### Atari XL/XE + FujiNet
 
