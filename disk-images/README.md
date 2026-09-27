@@ -6,6 +6,35 @@ setting up the real hardware for this project. The `.bas` source in
 images are practical starting points/reference, not a replacement for
 it (may contain older client versions).
 
+## `rtbclient.d64`
+
+Fresh C64 disk image with the current clients: `rtb` (Meatloaf client),
+`rtbwic` (WiC64 client) and `fotofix.c000` (the WiC64 driver `rtbwic`
+loads itself). Load with `LOAD"RTB",8` or `LOAD"RTBWIC",8`, then `RUN`.
+Regenerate (VICE tools):
+
+```
+petcat -w2 -o rtb.prg -- clients/c64/tron_c64_client.bas
+petcat -w2 -o rtbwic.prg -- clients/c64/tron_c64_wic64_client.bas
+c1541 -format "retrotronbattle,26" d64 disk-images/rtbclient.d64 \
+    -write rtb.prg rtb -write rtbwic.prg rtbwic \
+    -write clients/c64/wic64-driver/FOTOFIX.C000 fotofix.c000
+```
+
+## `rtbclient.atr`
+
+Fresh Atari DOS 2.0S boot disk for FujiNet, made from `n-handler.atr`
+below: `DOS.SYS`, `AUTORUN.SYS` (the `N:` handler), the FujiNet
+`N*.COM`/`CONFIG`/`COPY` tools, and the current client as `RTB.LST`
+(ATASCII listing; old test programs removed, their sectors zeroed).
+After booting into BASIC: `ENTER"D:RTB.LST"`, then `SAVE"D:RTB.BAS"`
+once, `RUN`. Regenerate the client file on it:
+
+```
+python3 tools/atr_dos2_put.py disk-images/rtbclient.atr \
+    --put clients/atari/tron_atari_client.bas RTB.LST
+```
+
 ## `n-handler.atr`
 
 Atari disk image (FujiNet SD card content) with the `N:` network

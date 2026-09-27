@@ -28,6 +28,10 @@ useful as a starting point for similar diagnostics on a new platform:
   (WinAPE DATA format) as a headerless ASCII file, replacing an existing
   file of the same name - used to refresh `disk-images/cpcclient.dsk`
   (see `disk-images/README.md`)
+- `atr_dos2_put.py` - adds/replaces/removes files on a single-density
+  Atari DOS 2.0S `.ATR` image; `.LST`/`.TXT` targets are converted to
+  ATASCII for `ENTER`. Zeroes free sectors and rebuilds the VTOC - used
+  for `disk-images/rtbclient.atr`
 
 ## External tools (no longer bundled in the repo)
 
