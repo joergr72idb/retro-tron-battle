@@ -17,12 +17,18 @@ the current
 via paste in Altirra/Fujisan) — see `CLAUDE.md`, section "Transferring
 clients to the target systems".
 
-## `cpcclient2.dsk`
+## `cpcclient.dsk`
 
-Schneider/Amstrad CPC disk image with an older version of the CPC
-client (AMSDOS header already set correctly, see the "Line too long"
-lesson in `CLAUDE.md`). Reference for the WinAPE workflow when
-creating a new M4 disk.
+Schneider/Amstrad CPC disk image. `CLIENT.BAS` is the current CPC
+client (build 8), stored as a headerless ASCII file - load it with
+`RUN"CLIENT"` (AMSDOS detects ASCII automatically; loading is a bit
+slower than tokenized BASIC). The `HCWARS*.BAS` files are older
+leftovers. Regenerate after changing the client source:
+
+```
+python3 tools/cpc_dsk_put.py disk-images/cpcclient.dsk \
+    clients/cpc/tron_cpc_client.bas CLIENT.BAS
+```
 
 ## `fotofix.d64`
 

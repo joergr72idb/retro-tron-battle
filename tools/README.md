@@ -22,6 +22,13 @@ useful as a starting point for similar diagnostics on a new platform:
   whether connection reuse is worth adopting for lower `/tick` latency
   before committing to a protocol change (see `CLAUDE.md`)
 
+## Build helpers
+
+- `cpc_dsk_put.py` - writes a `.bas` source onto a CPC `.DSK` image
+  (WinAPE DATA format) as a headerless ASCII file, replacing an existing
+  file of the same name - used to refresh `disk-images/cpcclient.dsk`
+  (see `disk-images/README.md`)
+
 ## External tools (no longer bundled in the repo)
 
 Local copies of the following two third-party tools used to live here;
