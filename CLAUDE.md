@@ -172,6 +172,16 @@ server:
   in the PIN prompt. Fix (build 8): `WHILE INKEY$<>"":WEND` right
   before the prompt. Deliberately not `CLEAR INPUT`, which only exists
   in BASIC 1.1 (664/6128) and would be a syntax error on a 464.
+- **Screen saver (build 9, RGB build 3)** - the event CPC runs on a
+  monochrome CRT, so a static idle screen risks burn-in. After 3 min
+  (`SW=54000`, 1/300 s units of `TIME`) without a key at the PIN prompt
+  or while "WAITING FOR OPPONENT...", all inks + border go black
+  (GOSUB 5200; screen RAM untouched); any key or joystick move restores
+  the MODE 1 default inks (GOSUB 5300), and a START lifts it
+  automatically. Because of that, the PIN prompt is no longer `INPUT`
+  but an `INKEY$` loop (GOSUB 5000; ENTER, DEL, codes 32-126 only, max
+  20 chars, the wake key is swallowed). Line 85 restores the inks on
+  every `RUN`, since `MODE`/`RUN` don't reset them.
 
 ### Atari XL/XE + FujiNet
 

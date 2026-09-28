@@ -49,7 +49,7 @@ clients to the target systems".
 ## `cpcclient.dsk`
 
 Schneider/Amstrad CPC disk image. `CLIENT.BAS` is the current CPC
-client (build 8), stored as a headerless ASCII file - load it with
+client (build 9), stored as a headerless ASCII file - load it with
 `RUN"CLIENT"` (AMSDOS detects ASCII automatically; loading is a bit
 slower than tokenized BASIC). The `HCWARS*.BAS` files are older
 leftovers. Regenerate after changing the client source:
