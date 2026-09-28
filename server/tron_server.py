@@ -131,7 +131,7 @@ from datetime import datetime
 # =============================================================================
 # VERSION - increment on every content change (shown in console + window)
 # =============================================================================
-SERVER_BUILD = 16
+SERVER_BUILD = 17
 # =============================================================================
 
 # =============================================================================
@@ -969,16 +969,28 @@ async def drain_moves(players):
                     _apply_direction(p, d)
 
     for p in players:
-        try:
-            data = await asyncio.wait_for(p.reader.read(256), timeout=0.01)
-        except asyncio.TimeoutError:
-            data = b""
-        except (ConnectionResetError, BrokenPipeError):
-            p.alive = False
-            continue
-        if data:
-            p.inbuf.feed(data)
-        elif data == b"" and isinstance(p.reader, asyncio.StreamReader) and p.reader.at_eof():
+        # Read EVERYTHING that's waiting, not just one chunk: an HTTP
+        # "connection" hands out one queued line per read(), and a client
+        # polling faster than TICK_RATE (CPC since client build 10, ~70 ms
+        # per /tick) queues several MOVEs per tick - reading only one per
+        # tick built an ever-growing backlog, so its moves arrived seconds
+        # late or not at all before the game ended.
+        gone = False
+        for _ in range(64):
+            try:
+                data = await asyncio.wait_for(p.reader.read(256), timeout=0.01)
+            except asyncio.TimeoutError:
+                break
+            except (ConnectionResetError, BrokenPipeError):
+                gone = True
+                break
+            if data:
+                p.inbuf.feed(data)
+                continue
+            if isinstance(p.reader, asyncio.StreamReader) and p.reader.at_eof():
+                gone = True
+            break
+        if gone:
             p.alive = False
             continue
         while True:

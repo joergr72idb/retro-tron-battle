@@ -214,6 +214,20 @@ server:
   ~570 ms/tick a game rarely lasted enough ticks before `RUN` reset the
   heap. Fix: `MEMORY &7FFF` at line 25. General rule: any fixed RAM
   buffer for an RSX/machine code on the CPC needs a `MEMORY` below it.
+- **Server-side MOVE backlog for fast pollers (server build 17, RGB
+  server build 6):** after build 10 only ~2 CPC direction changes per
+  game reached the server (confirmed with two different CPCs, both
+  joystick modes). Cause was the server, not the CPC: every `/tick`
+  with a direction (held stick = every poll) queues one `MOVE` line,
+  but `drain_moves()` read only **one** chunk per player per 250 ms
+  tick - and an HTTP "connection" hands out one line per `read()`. At
+  ~570 ms/poll that never mattered; at ~70 ms/poll the queue grew by
+  ~3 lines per tick, so moves arrived seconds late or never. Fix:
+  `drain_moves()` now reads everything waiting (up to 64 chunks).
+  Reproduced + verified with a simulated 70 ms poller holding the
+  stick: old server 2 of 6 moves (2nd one 3.5 s late), new server 6 of
+  6, each within 0.18 s. Latent for any client polling faster than
+  TICK_RATE.
 
 ### Atari XL/XE + FujiNet
 
