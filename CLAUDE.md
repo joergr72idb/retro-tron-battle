@@ -228,6 +228,15 @@ server:
   stick: old server 2 of 6 moves (2nd one 3.5 s late), new server 6 of
   6, each within 0.18 s. Latent for any client polling faster than
   TICK_RATE.
+- **Confirmed on real hardware (2026-09-28, CPC client build 11 +
+  server build 17):** steering on the CPC felt "perfect" (user). Log of
+  7 real matches vs C64/Atari: CPC poll ~68-82 ms steady, 6-24 CPC
+  direction changes per game arriving (was ~2), games up to 569 CPC
+  polls without the "Overflow" crash. Results CPC 4, C64 2, Atari 1 -
+  not treated as a clear machine advantage yet. **Open decision:**
+  whether to add the CPC to the latency equalizer (like
+  `ATARI_LATENCY_*`) - deferred until more matches with players
+  swapping machines show whether the CPC wins regardless of who plays.
 
 ### Atari XL/XE + FujiNet
 
