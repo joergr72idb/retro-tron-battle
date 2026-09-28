@@ -200,6 +200,20 @@ server:
     once at line 72, and the read loop zeroes each byte right after
     reading it. Only assumption: responses never contain an embedded
     null byte.
+  - **Result on hardware (2026-09-28):** CPC tick round-trip dropped from
+    ~570 ms to **~65-80 ms** - the BASIC clearing loop, not the M4, was
+    most of the old latency. The CPC now polls faster than the server's
+    250 ms tick and faster than C64/Meatloaf (~320 ms).
+- **"Overflow in 2040" - `BUF=&8000` sat inside BASIC's string heap
+  (build 11, RGB build 5):** Locomotive BASIC stores strings from HIMEM
+  downwards, and nothing reserved `&8000`, so after ~100 ticks (each
+  tick leaves ~100 bytes of garbage strings: `U$`, `R$` built char by
+  char) the string heap reached the M4's response buffer and the two
+  overwrote each other - the CPC crashed mid-game with "Overflow in
+  2040" (the `|HTTPMEM` line). This was always latent; at the old
+  ~570 ms/tick a game rarely lasted enough ticks before `RUN` reset the
+  heap. Fix: `MEMORY &7FFF` at line 25. General rule: any fixed RAM
+  buffer for an RSX/machine code on the CPC needs a `MEMORY` below it.
 
 ### Atari XL/XE + FujiNet
 
