@@ -69,7 +69,8 @@ this process's memory and on the screen. Bots that want to "see" the
 game (like tron_bot.sh) should use their own timer to decide when to
 turn, instead of reacting to incoming tick data.
 
-Between pairing and the first tick there's a short countdown on
+Between pairing and the first tick there's a short "VS" intro with
+both visitor photos (VERSUS_SCREEN, ~4 s) and then a countdown on
 screen (3, 2, 1, then a closing line), visible in the pygame window.
 Direction changes sent during the countdown are already read in and
 applied, but nobody actually moves until the closing line appears -
@@ -129,7 +130,7 @@ from datetime import datetime
 # =============================================================================
 # VERSION - increment on every content change (shown in console + window)
 # =============================================================================
-SERVER_BUILD = 13
+SERVER_BUILD = 14
 # =============================================================================
 
 # =============================================================================
@@ -160,6 +161,21 @@ SCROLL_COLOR_SPEED = 0.02    # color gradient shift per frame (rainbow)
 # =============================================================================
 SCROLL_LOOPS_BEFORE_HIGHSCORE = 2  # the high-score list shows after this many full loops
 HIGHSCORE_DURATION = 20            # seconds the list stays up before the scroller resumes
+# =============================================================================
+
+# =============================================================================
+# VERSUS SCREEN - SHOWN RIGHT AFTER PAIRING, BEFORE THE 3-2-1 COUNTDOWN
+# =============================================================================
+# Both visitor photos (platform logo if there's no photo) slide in big from
+# the left/right edges while pixelating into focus, a color-cycling "VS"
+# slams in between them with a flash and a screen shake, copper-style
+# raster bars roll behind, CRT scanlines on top - then the whole thing
+# fades away and reveals the playfield for the countdown. Clients don't
+# notice anything: they already got START and just keep polling, and
+# direction changes are read in the whole time (like in the countdown).
+VERSUS_SCREEN = True     # <-- EDIT: False = straight to the countdown, as before
+VERSUS_DURATION = 4.0    # <-- EDIT: seconds in total, including the fade-out
+VERSUS_FADE = 0.8        # <-- EDIT: seconds of that spent fading away
 # =============================================================================
 
 # =============================================================================
@@ -558,7 +574,7 @@ lock = asyncio.Lock()
 # ---------------------------------------------------------------------------
 render_lock = threading.Lock()
 render_state = {
-    "phase": "waiting",          # waiting | countdown | playing | ended
+    "phase": "waiting",          # waiting | versus | countdown | playing | ended
     "status": "Waiting for lightcycles to connect...",
     "p1_name": "", "p1_plat": "",
     "p2_name": "", "p2_plat": "",
@@ -567,6 +583,7 @@ render_state = {
     "photo1": None, "photo2": None,
     "logo1": None, "logo2": None,
     "countdown": "",
+    "versus_start": 0.0,         # time.monotonic() when the versus screen began
     "games_played": stats.games_played,
     "wins": dict(stats.wins),
     "draws": stats.draws,
@@ -590,6 +607,7 @@ def snapshot_render():
             "photo1": render_state["photo1"], "photo2": render_state["photo2"],
             "logo1": render_state["logo1"], "logo2": render_state["logo2"],
             "countdown": render_state["countdown"],
+            "versus_start": render_state["versus_start"],
             "games_played": render_state["games_played"],
             "wins": dict(render_state["wins"]),
             "draws": render_state["draws"],
@@ -987,7 +1005,8 @@ async def run_game(p1: Player, p2: Player):
     photo1, photo2 = await asyncio.gather(resolve_photo(p1), resolve_photo(p2))
 
     update_render(
-        phase="countdown",
+        phase="versus" if VERSUS_SCREEN else "countdown",
+        versus_start=time.monotonic(),
         status="",
         p1_name=p1.name, p1_plat=p1.platform,
         p2_name=p2.name, p2_plat=p2.platform,
@@ -1000,17 +1019,26 @@ async def run_game(p1: Player, p2: Player):
 
     players = [p1, p2]
 
+    async def pause_reading_moves(seconds):
+        """Waits, but keeps reading direction changes (nothing gets lost)
+        and stops early if someone sends BYE."""
+        deadline = time.monotonic() + seconds
+        while time.monotonic() < deadline:
+            await drain_moves(players)
+            if not (p1.alive and p2.alive):
+                break
+            await asyncio.sleep(0.05)
+
+    if VERSUS_SCREEN:
+        await pause_reading_moves(VERSUS_DURATION)
+        update_render(phase="countdown")
+
     # --- Countdown: 3, 2, 1, then the closing line (see below) - direction
     # changes are already read in (so nothing gets lost), but nobody
     # actually moves. ---
     for count in (3, 2, 1):
         update_render(countdown=str(count))
-        deadline = time.monotonic() + 1.0
-        while time.monotonic() < deadline:
-            await drain_moves(players)
-            if not (p1.alive and p2.alive):
-                break  # someone sent BYE while waiting
-            await asyncio.sleep(0.05)
+        await pause_reading_moves(1.0)
 
     update_render(countdown="Go, get in there! Move!")
     await asyncio.sleep(0.6)
@@ -1338,6 +1366,104 @@ def pygame_loop():
                 screen.blit(line_surf, line_surf.get_rect(centerx=col_cx, top=y))
                 y += line_surf.get_height() + 2
 
+    versus_vs_font = load_tron_font(150)
+    versus_name_font = load_tron_font(34)
+
+    def pixelated(surf, block):
+        """Mosaic effect: shrink by `block`, blow back up without smoothing -
+        the "resolving into focus" look of 80s title screens."""
+        if block <= 1:
+            return surf
+        w, h = surf.get_size()
+        small = pygame.transform.scale(surf, (max(1, w // block), max(1, h // block)))
+        return pygame.transform.scale(small, (w, h))
+
+    # Versus screen covers everything between HUD and footer (both side
+    # panels + playfield), drawn onto its own surface so it can be faded.
+    versus_rect = pygame.Rect(0, HUD_HEIGHT, WINDOW_W, GRID_H * CELL)
+    versus_surf = pygame.Surface(versus_rect.size)
+    scanlines = pygame.Surface(versus_rect.size, pygame.SRCALPHA)
+    for sy in range(0, versus_rect.height, 3):
+        pygame.draw.line(scanlines, (0, 0, 0, 110), (0, sy), (versus_rect.width, sy))
+
+    def ease_out(x):
+        x = max(0.0, min(1.0, x))
+        return 1 - (1 - x) ** 3
+
+    def draw_versus(state, t):
+        """t = seconds since the versus screen began (see VERSUS_SCREEN)."""
+        vw, vh = versus_rect.size
+        vs = versus_surf
+        vs.fill((0, 0, 0))
+
+        # Copper-style raster bars rolling up and down behind everything
+        for i in range(6):
+            hue = (i / 6 + t * 0.15) % 1.0
+            rr, gg, bb = colorsys.hsv_to_rgb(hue, 0.9, 1.0)
+            cy = vh / 2 + math.sin(t * 2.2 + i * 0.9) * (vh / 2 - 30)
+            for k in range(-14, 15):
+                f = (1 - abs(k) / 15) * 0.45
+                pygame.draw.line(vs, (int(rr * 255 * f), int(gg * 255 * f), int(bb * 255 * f)),
+                                 (0, cy + k), (vw, cy + k))
+
+        # Screen shake right after the VS slam
+        shake_x = shake_y = 0
+        if 0.55 <= t < 0.9:
+            amp = 10 * (0.9 - t) / 0.35
+            shake_x = random.randint(-1, 1) * amp
+            shake_y = random.randint(-1, 1) * amp
+
+        # The two cards: photo (or platform logo) sliding in from the edges
+        card_w, card_h = vw // 2 - 170, vh - 110
+        for side in (1, 2):
+            plat = state[f"p{side}_plat"]
+            name = state[f"p{side}_name"]
+            color = color_for(plat)
+            img = load_scaled(state[f"photo{side}"], card_w, card_h) \
+                or load_scaled(state[f"logo{side}"], card_w, card_h)
+            home_cx = vw // 4 - 40 if side == 1 else vw * 3 // 4 + 40
+            start_cx = -card_w if side == 1 else vw + card_w
+            cx = start_cx + (home_cx - start_cx) * ease_out(t / 0.5) + shake_x
+            top = 25 + shake_y
+            if img:
+                block = int(1 + 23 * (1 - ease_out(t / 0.9)))
+                shown = pixelated(img, block)
+                rect = shown.get_rect(centerx=cx, top=top)
+                vs.blit(shown, rect)
+                pygame.draw.rect(vs, color, rect.inflate(8, 8), 4)
+                bottom = rect.bottom
+            else:
+                bottom = top + card_h
+            # Name typed out letter by letter once the card has landed
+            label = f"{plat}/{name}"
+            n = int(max(0.0, t - 0.6) * 20)
+            if n > 0:
+                txt = versus_name_font.render(label[:n], True, color)
+                vs.blit(txt, txt.get_rect(centerx=cx, top=bottom + 14))
+
+        # "VS" slams in: zooms down from 4x, color-cycling, with a white flash
+        if t >= 0.35:
+            zoom = 1 + 3 * (1 - ease_out((t - 0.35) / 0.2))
+            hue = (t * 1.5) % 1.0
+            rr, gg, bb = colorsys.hsv_to_rgb(hue, 0.8, 1.0)
+            vs_txt = versus_vs_font.render("VS", True, (int(rr * 255), int(gg * 255), int(bb * 255)))
+            if zoom > 1.01:
+                w, h = vs_txt.get_size()
+                vs_txt = pygame.transform.scale(vs_txt, (int(w * zoom), int(h * zoom)))
+            vs.blit(vs_txt, vs_txt.get_rect(center=(vw // 2 + shake_x, vh // 2 + shake_y)))
+        if 0.55 <= t < 0.65:
+            vs.fill((255, 255, 255))
+
+        vs.blit(scanlines, (0, 0))
+
+        # Fade away at the end, revealing the playfield underneath
+        fade_start = VERSUS_DURATION - VERSUS_FADE
+        alpha = 255
+        if t > fade_start:
+            alpha = int(255 * max(0.0, 1 - (t - fade_start) / VERSUS_FADE))
+        vs.set_alpha(alpha)
+        screen.blit(vs, versus_rect)
+
     running = True
     while running:
         for event in pygame.event.get():
@@ -1381,7 +1507,7 @@ def pygame_loop():
             screen.blit(event_logo_surf, rect)
 
         # --- Side panels (logo + visitor photo) ---
-        if state["phase"] in ("countdown", "playing", "ended"):
+        if state["phase"] in ("versus", "countdown", "playing", "ended"):
             draw_panel(0, state["p1_name"], state["p1_plat"], state["photo1"], state["logo1"])
             draw_panel(FIELD_X + GRID_W * CELL, state["p2_name"], state["p2_plat"],
                        state["photo2"], state["logo2"])
@@ -1443,9 +1569,12 @@ def pygame_loop():
                 rect = (FIELD_X + hx * CELL + 1, HUD_HEIGHT + hy * CELL + 1, CELL - 2, CELL - 2)
                 pygame.draw.rect(screen, (255, 255, 255), rect, 2)
 
-        if state["phase"] in ("countdown", "playing", "ended"):
+        if state["phase"] in ("versus", "countdown", "playing", "ended"):
             draw_trail(state["trail1"], state["p1_plat"], state["pos1"])
             draw_trail(state["trail2"], state["p2_plat"], state["pos2"])
+
+        if state["phase"] == "versus":
+            draw_versus(state, time.monotonic() - state["versus_start"])
 
         if state["phase"] == "countdown" and state["countdown"]:
             cd_color = (120, 255, 140) if state["countdown"] == "Go, get in there! Move!" else (255, 220, 80)
