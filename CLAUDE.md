@@ -181,7 +181,25 @@ server:
   automatically. Because of that, the PIN prompt is no longer `INPUT`
   but an `INKEY$` loop (GOSUB 5000; ENTER, DEL, codes 32-126 only, max
   20 chars, the wake key is swallowed). Line 85 restores the inks on
-  every `RUN`, since `MODE`/`RUN` don't reset them.
+  every `RUN`, since `MODE`/`RUN` don't reset them. Screen saver and the
+  build 8 flush confirmed working on real hardware 2026-09-28.
+- **Steering feel (build 10, RGB build 4)** - after family playtests
+  2026-09-28 the CPC still steered worse than C64/Atari. Two fixes, not
+  yet verified on hardware:
+  - `JOY(0)` only sees the stick at the moment of the read, so a tap
+    during the ~0.5 s `|HTTPMEM` call was lost. The main loop now first
+    drains the key buffer (where the firmware queues every stick move,
+    see above) and keeps the last direction; a stick held at `JOY(0)`
+    time still wins. Accepts both joystick codes (&0B/&0A/&08/&09) and
+    cursor codes (&F0-&F3) for U/D/L/R, since it wasn't verified which
+    ones the stick produces (`JK$`, line 73). The opponent-wait screen
+    saver wake uses the `KP` flag from that drain instead of its own
+    `INKEY$`.
+  - The HTTP routine no longer POKEs all `BL` buffer bytes to zero
+    before every call (~0.1 s per tick in BASIC): the buffer is cleared
+    once at line 72, and the read loop zeroes each byte right after
+    reading it. Only assumption: responses never contain an embedded
+    null byte.
 
 ### Atari XL/XE + FujiNet
 
