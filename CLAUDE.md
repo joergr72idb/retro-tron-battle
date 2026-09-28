@@ -607,6 +607,44 @@ Atari vs. C64/Meatloaf and Atari vs. CPC/M4 - steering now feels equal
 on all clients, so the first-guess range stays as is. (C64/WiC64 not
 part of that test, no hardware.)
 
+## Dynamic pairwise latency equalizer (server build 18, 2026-09-28)
+
+The static rule above only knows "Atari = fast". Since CPC build 10 the
+CPC polls every ~70 ms, faster than Meatloaf (~300 ms), and WiC64 (~1.3 s)
+is far slower than both. The event WLAN may also change round trips on the
+day. So the server now measures every match itself (`DYNAMIC_LATENCY_
+EQUALIZER` and `EQ_*` in `server/tron_server.py`, `setup_equalizer()`):
+
+- From GAME START until the end of the countdown (~7.6 s, nobody moves
+  yet) every `/tick` interval of an HTTP player is recorded
+  (`HTTPPlayerConn.tick_gaps`); the median is its poll interval. The
+  second tick after START is always an outlier (see above), which the
+  median absorbs.
+- Effective input delay = `EQ_POLL_FACTOR` (0.75) x poll: a stick move
+  lands at a random point in the poll cycle (0.5 on average) and still has
+  to travel with the next request. Raw TCP (Atari) = `EQ_TCP_DELAY` (0).
+- Only the **faster** player of the pair is held back, by the difference,
+  capped at `EQ_MAX_DELAY` (0.45 s, the old static maximum); under
+  `EQ_MIN_DELAY` (20 ms) nobody is delayed. The delay is fixed for the
+  match, and a move never overtakes one still pending, so order is kept.
+- Fewer than `EQ_MIN_SAMPLES` (3) intervals for a player, or the switch
+  off: the static Atari rule applies for that match, as before.
+- Log per game: `[equalizer] <p1> poll ... -> ..., <p2> ... => <who> +N ms`
+  before the start, and `[equalizer] in-game poll median: ...` at the end,
+  to check the measurement against the actual game.
+
+Examples with the defaults: Atari vs Meatloaf -> Atari +226 ms, Atari vs
+CPC -> Atari +53 ms, CPC vs Meatloaf -> CPC +172 ms, Atari vs WiC64 ->
+Atari +450 ms (capped). **Tuning note:** vs Meatloaf this is a bit less
+than the static rule (0.25-0.45 s, avg 0.35 s) that playtested as "equal"
+on 2026-09-26 - if the Atari feels too sharp again, raise
+`EQ_POLL_FACTOR` towards 1.0-1.1 first.
+
+Verified 2026-09-28 only headless: real server network side against
+simulated clients (TCP Atari, HTTP pollers at 70/300/1280 ms) - measured
+values, delays and move order as expected. **Not yet playtested on real
+hardware.**
+
 ## General, cross-platform patterns
 
 1. **Reserved variable names are a recurring trap.** ALWAYS check
