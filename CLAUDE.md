@@ -233,10 +233,9 @@ server:
   7 real matches vs C64/Atari: CPC poll ~68-82 ms steady, 6-24 CPC
   direction changes per game arriving (was ~2), games up to 569 CPC
   polls without the "Overflow" crash. Results CPC 4, C64 2, Atari 1 -
-  not treated as a clear machine advantage yet. **Open decision:**
-  whether to add the CPC to the latency equalizer (like
-  `ATARI_LATENCY_*`) - deferred until more matches with players
-  swapping machines show whether the CPC wins regardless of who plays.
+  not treated as a clear machine advantage yet. The CPC is now covered
+  by the dynamic pairwise equalizer (server build 18), playtested as
+  fair on 2026-10-01 - see "Dynamic pairwise latency equalizer".
 
 ### Atari XL/XE + FujiNet
 
@@ -642,8 +641,18 @@ on 2026-09-26 - if the Atari feels too sharp again, raise
 
 Verified 2026-09-28 only headless: real server network side against
 simulated clients (TCP Atari, HTTP pollers at 70/300/1280 ms) - measured
-values, delays and move order as expected. **Not yet playtested on real
-hardware.**
+values, delays and move order as expected.
+
+**Confirmed on real hardware (2026-10-01, server build 18, Atari client
+19, C64 Meatloaf 18, CPC 11):** 5 matches covering all three pairings,
+steering felt fair on every machine (user). Log: Atari vs C64 -> Atari
++252/+255 ms, C64 vs CPC -> CPC +202/+203 ms, Atari vs CPC -> Atari
++50 ms. The countdown measurement matched the in-game median within
+1-5 ms every time (C64 ~340 ms, CPC ~68-73 ms), so measuring only
+during the countdown is enough. Results Atari 2, CPC 1, C64 1, 1 draw.
+Isolated single poll gaps of 0.6-1.0 s (one per match at most) looked
+like WLAN hiccups, not client problems. Defaults (`EQ_POLL_FACTOR`
+0.75) kept unchanged.
 
 ## General, cross-platform patterns
 
@@ -994,9 +1003,10 @@ PIN `MUSTER`, instead of setting up your own test images.
   ("main loop only checked START/ERR/END in lowercase", see the
   Meatloaf section above) confirmed the same day in several real,
   steered cross-platform matches against the CPC client - "USE
-  JOYSTICK" now shows up reliably. The instant-START join-response fix
-  (build 18, see bullet above) still needs its own hardware
-  verification.
+  JOYSTICK" now shows up reliably. Build 18 (instant-START
+  join-response fix) ran on real hardware on 2026-10-01 through 4
+  matches without problems; the specific back-to-back-join case was not
+  deliberately tested.
 - **CPC client**: stable so far (before the simplification); got the
   same join-response fix as the Meatloaf client as a precaution.
   Verified on real hardware after the simplification on 2026-09-19
