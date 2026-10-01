@@ -51,15 +51,15 @@ clients to the target systems".
 
 ## `cpc/rtb.dsk`
 
-Schneider/Amstrad CPC disk image. `CLIENT.BAS` is the current CPC
+Schneider/Amstrad CPC disk image. `RTB.BAS` is the current CPC
 client (build 11), stored as a headerless ASCII file - load it with
-`RUN"CLIENT"` (AMSDOS detects ASCII automatically; loading is a bit
+`RUN"RTB"` (AMSDOS detects ASCII automatically; loading is a bit
 slower than tokenized BASIC). It is the only file on the image.
 Regenerate after changing the client source:
 
 ```
 python3 tools/cpc_dsk_put.py disk-images/cpc/rtb.dsk \
-    clients/cpc/tron_cpc_client.bas CLIENT.BAS
+    clients/cpc/tron_cpc_client.bas RTB.BAS
 ```
 
 ## `c64/fotofix.d64`
