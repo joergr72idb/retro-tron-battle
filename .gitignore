@@ -4,3 +4,8 @@ photo_cache/
 tron_results.csv
 tron_server.log
 .DS_Store
+# Third-party files that may not be redistributed - keep local copies only
+assets/font/*.ttf
+assets/font/Font License.txt
+clients/c64/wic64-driver/FOTOFIX.C000
+disk-images/c64/fotofix.d64

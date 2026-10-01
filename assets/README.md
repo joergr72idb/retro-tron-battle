@@ -26,6 +26,8 @@ The `.ttf` file for the demo scroll text, see `SCROLL_FONT_PATH` in
 `server/tron_server.py`. Leave empty (`SCROLL_FONT_PATH = ""`) to use
 the default font if you don't want a custom one.
 
-**Mind the license:** if the font (e.g. a "Flynn"/TRON fan font) is
-only cleared for personal use, check before any public push whether
-redistributing it via the git repo is actually allowed.
+**Not included:** the "Flynn" font by Neale Davidson (Pixel Sagas)
+used at the event may not be offered for download by third parties.
+Download it yourself (link in `info.txt`) and put `Flynn-4v54.ttf`
+here - `assets/font/*.ttf` is gitignored. Without it the server falls
+back to the default font.

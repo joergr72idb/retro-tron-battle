@@ -284,9 +284,11 @@ server:
   contains the original, abandoned approach of "write our own driver
   from scratch" — don't pursue that, the approach above is more
   promising). **Author of `FOTOFIX.C000`: Andreas Beermann**
-  ("andi6510", see the disk label of the original `fotofix.d64`) — the
-  file now lives under `clients/c64/wic64-driver/` in the repo, see
-  the README there for details/credit.
+  ("andi6510", see the disk label of the original `fotofix.d64`). Since
+  the repo went public (2026-10-01) neither `FOTOFIX.C000` nor
+  `fotofix.d64` is tracked (no redistribution permission) - keep local
+  copies under `clients/c64/wic64-driver/` and `disk-images/c64/`
+  (gitignored), see the README there for details/credit.
 - Hans has developed the fotofix idea - many thanks from here!
 - **"USE JOYSTICK" never printed for a second player who joined via
   HTTP and got matched instantly (2026-09-20, found while porting this
@@ -887,11 +889,11 @@ python -m pyftpdlib -p 21
 Visitor PINs already used for testing: `0001`, `0002`, `4711`, `0815`.
 
 **Ready-made test fixture:** [`assets/test_ftproot/`](./assets/test_ftproot/)
-contains a demo photo (`photo.jpg`) and an ASCII-art file
-(`ascii-terminal.txt`) under PIN `MUSTER`, downloaded from the real
-`fotofix.classic-computing.de` server. `ascii-terminal.txt` hasn't
-been fetched by any client since the 2026-09-12 client simplification,
-but stays in place as a fixture (harmless, minimal upkeep). Just start
+contains a generated test-card image (`photo.jpg`) under PIN
+`MUSTER` (the original demo photo from the real
+`fotofix.classic-computing.de` server and its unused
+`ascii-terminal.txt` were removed before the repo went public, rights
+unclear). Just start
 the pyftpdlib command above from `assets/test_ftproot/` and test with
 PIN `MUSTER`, instead of setting up your own test images.
 

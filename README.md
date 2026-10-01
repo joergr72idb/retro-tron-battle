@@ -60,9 +60,9 @@ archive/    Abandoned approaches, kept for reference
 Each `.bas` client has a short config block right at the top (server
 IP, port, player name) — edit before use. The WiC64 client
 (`clients/c64/tron_c64_wic64_client.bas`) additionally needs the file
-`FOTOFIX.C000` on the same disk — already provided under
-[`clients/c64/wic64-driver/`](./clients/c64/wic64-driver/) (WiC64
-driver assembly by Andreas Beermann, see `CLAUDE.md`).
+`FOTOFIX.C000` (WiC64 driver by Andreas Beermann) on the same disk. It
+is **not included** in this repo, see
+[`clients/c64/wic64-driver/`](./clients/c64/wic64-driver/).
 
 ## Server configuration
 
@@ -74,6 +74,16 @@ config file.
 ## Thanks
 
 Hans has developed the fotofix idea - many thanks from here!
+
+## License
+
+The project's own code and documentation are under the [MIT License](./LICENSE).
+Not covered by it: the manufacturer, club and project logos in
+`assets/logos/` (trademarks of their owners), and the third-party
+programs on the Atari disk images (FujiNet tools, Atari DOS 2.0S). The
+"Flynn" scroll font and the WiC64 driver `FOTOFIX.C000` are not
+included at all, see `assets/README.md` and
+`clients/c64/wic64-driver/README.md`.
 
 ## AI notice
 

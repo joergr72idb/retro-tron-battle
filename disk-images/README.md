@@ -12,15 +12,18 @@ The client images are named `rtb.<ext>`.
 ## `c64/rtb.d64`
 
 Fresh C64 disk image with the current clients: `rtb` (Meatloaf client),
-`rtbwic` (WiC64 client) and `fotofix.c000` (the WiC64 driver `rtbwic`
-loads itself). Load with `LOAD"RTB",8` or `LOAD"RTBWIC",8`, then `RUN`.
+`rtbwic` (WiC64 client). `rtbwic` also needs `fotofix.c000` (the WiC64
+driver it loads itself) on the same disk - not included, see
+[`clients/c64/wic64-driver/`](../clients/c64/wic64-driver/). Load with `LOAD"RTB",8` or `LOAD"RTBWIC",8`, then `RUN`.
 Regenerate (VICE tools):
 
 ```
 petcat -w2 -o rtb.prg -- clients/c64/tron_c64_client.bas
 petcat -w2 -o rtbwic.prg -- clients/c64/tron_c64_wic64_client.bas
 c1541 -format "retrotronbattle,26" d64 disk-images/c64/rtb.d64 \
-    -write rtb.prg rtb -write rtbwic.prg rtbwic \
+    -write rtb.prg rtb -write rtbwic.prg rtbwic
+# optionally, with a local copy of the driver:
+c1541 -attach disk-images/c64/rtb.d64 \
     -write clients/c64/wic64-driver/FOTOFIX.C000 fotofix.c000
 ```
 
@@ -62,13 +65,11 @@ python3 tools/cpc_dsk_put.py disk-images/cpc/rtb.dsk \
     clients/cpc/tron_cpc_client.bas RTB.BAS
 ```
 
-## `c64/fotofix.d64`
+## `c64/fotofix.d64` (not included)
 
-Original disk from Andreas Beermann ("andi6510"), from which
-`FOTOFIX.C000` (the WiC64 driver routine in
-[`clients/c64/wic64-driver/`](../clients/c64/wic64-driver/)) was
-extracted. Also contains `fotofix` (the complete FOTOFIX example
-program) and `rtbwic64` (an already-typed-in copy of an earlier
-version of our own WiC64 client on the disk). See
+Not included (third-party). Original disk from Andreas Beermann
+("andi6510") with the FOTOFIX example program, from which
+`FOTOFIX.C000` (the WiC64 driver routine) was extracted. If you have
+it, keep it here locally - the path is gitignored. See
 [`clients/c64/wic64-driver/README.md`](../clients/c64/wic64-driver/README.md)
 for details/credit.
