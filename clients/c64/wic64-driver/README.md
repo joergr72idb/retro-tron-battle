@@ -22,7 +22,7 @@ by Andreas Beermann (the original disk also contains `fotofix` — the
 complete FOTOFIX example program — and `rtbwic64`, an already-typed-in
 copy of our own WiC64 client for testing on real hardware). The
 complete original image is at
-[`disk-images/fotofix.d64`](../../../disk-images/fotofix.d64).
+[`disk-images/c64/fotofix.d64`](../../../disk-images/c64/fotofix.d64).
 
 ## Known error string in the routine
 

@@ -6,7 +6,10 @@ setting up the real hardware for this project. The `.bas` source in
 images are practical starting points/reference, not a replacement for
 it (may contain older client versions).
 
-## `rtbclient.d64`
+One folder per platform: `atari/`, `c64/`, `cpc/` (Schneider/Amstrad).
+The client images are named `rtb.<ext>`.
+
+## `c64/rtb.d64`
 
 Fresh C64 disk image with the current clients: `rtb` (Meatloaf client),
 `rtbwic` (WiC64 client) and `fotofix.c000` (the WiC64 driver `rtbwic`
@@ -16,12 +19,12 @@ Regenerate (VICE tools):
 ```
 petcat -w2 -o rtb.prg -- clients/c64/tron_c64_client.bas
 petcat -w2 -o rtbwic.prg -- clients/c64/tron_c64_wic64_client.bas
-c1541 -format "retrotronbattle,26" d64 disk-images/rtbclient.d64 \
+c1541 -format "retrotronbattle,26" d64 disk-images/c64/rtb.d64 \
     -write rtb.prg rtb -write rtbwic.prg rtbwic \
     -write clients/c64/wic64-driver/FOTOFIX.C000 fotofix.c000
 ```
 
-## `rtbclient.atr`
+## `atari/rtb.atr`
 
 Fresh Atari DOS 2.0S boot disk for FujiNet, made from `n-handler.atr`
 below: `DOS.SYS`, `AUTORUN.SYS` (the `N:` handler), the FujiNet
@@ -31,11 +34,11 @@ After booting into BASIC: `ENTER"D:RTB.LST"`, then `SAVE"D:RTB.BAS"`
 once, `RUN`. Regenerate the client file on it:
 
 ```
-python3 tools/atr_dos2_put.py disk-images/rtbclient.atr \
+python3 tools/atr_dos2_put.py disk-images/atari/rtb.atr \
     --put clients/atari/tron_atari_client.bas RTB.LST
 ```
 
-## `n-handler.atr`
+## `atari/n-handler.atr`
 
 Atari disk image (FujiNet SD card content) with the `N:` network
 handler the Atari client needs for TCP/HTTP over FujiNet, plus an
@@ -46,7 +49,7 @@ the current
 via paste in Altirra/Fujisan) — see `CLAUDE.md`, section "Transferring
 clients to the target systems".
 
-## `cpcclient.dsk`
+## `cpc/rtb.dsk`
 
 Schneider/Amstrad CPC disk image. `CLIENT.BAS` is the current CPC
 client (build 11), stored as a headerless ASCII file - load it with
@@ -55,11 +58,11 @@ slower than tokenized BASIC). It is the only file on the image.
 Regenerate after changing the client source:
 
 ```
-python3 tools/cpc_dsk_put.py disk-images/cpcclient.dsk \
+python3 tools/cpc_dsk_put.py disk-images/cpc/rtb.dsk \
     clients/cpc/tron_cpc_client.bas CLIENT.BAS
 ```
 
-## `fotofix.d64`
+## `c64/fotofix.d64`
 
 Original disk from Andreas Beermann ("andi6510"), from which
 `FOTOFIX.C000` (the WiC64 driver routine in
