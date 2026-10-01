@@ -5,6 +5,12 @@ Commodore 64, Schneider/Amstrad CPC) with server-side rendering — built
 for [Classic Computing 2026](https://www.classic-computing.de/cc2026/)
 in Celle (10–11 October 2026).
 
+![Test setup: Atari XL, Commodore 64 and Schneider CPC at the PIN prompt, server display in the middle](docs/images/test_setup.jpg)
+
+*The test setup: Atari XL with FujiNet, Commodore 64 with Meatloaf and
+Schneider CPC with M4 board, each waiting at the PIN prompt — the
+server's waiting screen in the middle.*
+
 Detailed background, design decisions, and hard-won platform quirks
 live in [`CLAUDE.md`](./CLAUDE.md) — please read it before making
 bigger changes.
