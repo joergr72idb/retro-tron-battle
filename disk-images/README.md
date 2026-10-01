@@ -51,8 +51,8 @@ clients to the target systems".
 Schneider/Amstrad CPC disk image. `CLIENT.BAS` is the current CPC
 client (build 11), stored as a headerless ASCII file - load it with
 `RUN"CLIENT"` (AMSDOS detects ASCII automatically; loading is a bit
-slower than tokenized BASIC). The `HCWARS*.BAS` files are older
-leftovers. Regenerate after changing the client source:
+slower than tokenized BASIC). It is the only file on the image.
+Regenerate after changing the client source:
 
 ```
 python3 tools/cpc_dsk_put.py disk-images/cpcclient.dsk \
