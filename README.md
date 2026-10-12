@@ -15,6 +15,33 @@ Detailed background, design decisions, and hard-won platform quirks
 live in [`CLAUDE.md`](./CLAUDE.md) — please read it before making
 bigger changes.
 
+## CC2026 results
+
+From Thursday evening (setup, 8 October) to Sunday afternoon the
+server logged **133 matches**, all on the real Atari XL, C64 (Meatloaf)
+and Schneider CPC. In **80 of them both players actually steered**. In
+the rest, at least one player didn't steer at all and their bike rode
+straight into the wall. The busiest hour was Sunday 13:00–14:00 with
+15 matches.
+
+| Pairing (both steering) | Matches | Atari | C64 | CPC | Draw |
+|---|---:|---:|---:|---:|---:|
+| Atari vs C64 | 49 | 31 | 17 | – | 1 |
+| C64 vs CPC | 23 | – | 8 | 15 | – |
+| Atari vs CPC | 8 | 6 | – | 2 | – |
+
+A battle lasted about 22 s at the median (including the ~7.6 s
+countdown), and the longest took 61 s.
+
+The dynamic latency equalizer measured the clients itself in 126 of
+the 133 matches. On the event WLAN the C64 polled about every 338 ms
+and the CPC about every 69 ms, both close to the values from home. The
+faster player was therefore held back by a median of +251 ms (Atari)
+or +207 ms (CPC). Even so, the C64 lost about two thirds of its real
+battles. Occasional Meatloaf hiccups (about 1 % of polls took around
+1.5 s or longer) may play a part, but with constantly changing players
+the sample is small.
+
 ## Hardware interfaces
 
 Each of the retro computers connects to the server over a WiFi
@@ -24,6 +51,32 @@ interface:
 - **Commodore 64:** [Meatloaf](https://github.com/idolpx/meatloaf)
   (standard client) or [WiC64](https://www.wic64.de/) (experimental)
 - **Schneider/Amstrad CPC:** [M4 Board](https://www.cpcwiki.eu/index.php/M4_Board)
+
+### Network: bring your own WLAN
+
+At Classic Computing 2026 the setup ran on its own WLAN from a
+FRITZ!Box rather than the hall WiFi. All the retro computers and the
+server joined this private network, and nearly 100 battles were played
+on the real hardware.
+
+The FRITZ!Box connected to the exhibition network as its WAN side and
+did NAT. That way the server could still fetch the visitor photos
+(JPGs, `PHOTO_SOURCE = "HTTP"`, `HTTP_PHOTO_BASE_URL`) from the event's
+photo server, for the intro screen before each battle and the side
+panel during it. The retro clients only ever talk to the server inside
+the private WLAN.
+
+The WLAN channel was left on automatic, because the hall was full of
+hotspots from visitors' smartphones and the FRITZ!Box can move away
+from busy channels by itself. The box stood right next to the retro
+computers, and with that strong signal it was a rock-solid access
+point for the whole event.
+
+We recommend the same for events: hall WiFi quality is unknown in
+advance, and it can be crowded. With your own router the SSID, the IP
+addresses (give the server a fixed one; the clients have it in their
+config blocks) and the round trips (see the latency equalizer in
+`CLAUDE.md`) stay the same as at home.
 
 ## Quickstart
 
