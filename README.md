@@ -73,6 +73,12 @@ the rest, at least one player didn't steer at all and their bike rode
 straight into the wall. The busiest hour was Sunday 13:00–14:00 with
 15 matches.
 
+![High-score screen on the server notebook (ThinkPad R400) after CC2026: Atari 44, C64 27, CPC 20 wins, 130 games, 39 draws](docs/images/cc2026_results.jpg)
+
+The server's own high-score screen at the end of the event counted 130
+games (Atari 44, C64 27, CPC 20 wins, 39 draws). The numbers below come
+from the log analysis and therefore differ slightly.
+
 | Pairing (both steering) | Matches | Atari | C64 | CPC | Draw |
 |---|---:|---:|---:|---:|---:|
 | Atari vs C64 | 49 | 31 | 17 | – | 1 |
