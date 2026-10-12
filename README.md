@@ -15,6 +15,53 @@ Detailed background, design decisions, and hard-won platform quirks
 live in [`CLAUDE.md`](./CLAUDE.md) — please read it before making
 bigger changes.
 
+## Setup example: Classic Computing 2026
+
+![Event setup at Classic Computing 2026: Atari XL, Commodore 64 and Schneider CPC with joysticks in front, server display in the middle, server notebook behind](docs/images/cc2026_setup.jpg)
+
+*The stand at Classic Computing 2026 in Celle. In front, from left: the
+Atari XL with FujiNet, the Commodore 64 with Meatloaf and the Schneider
+CPC with M4 board, each with its own joystick and screen. In the middle
+is the server display with the waiting screen, and behind it the
+notebook that runs the server.*
+
+If you want to run Retro Tron Battle at your own retro computer event,
+this is all you need:
+
+- **Two or more retro computers** with a WiFi interface (see
+  [Hardware interfaces](#hardware-interfaces)). Each one needs its own
+  screen and joystick.
+- **One computer for the server** (any machine with Python 3 and
+  pygame; a notebook is fine) plus **a big screen** for the playfield.
+  Visitors watch the battle there, not on the retro screens.
+- **Your own WLAN router**, see below.
+
+### Network: bring your own WLAN
+
+At Classic Computing 2026 the setup ran on its own WLAN from a
+FRITZ!Box rather than the hall WiFi. All the retro computers and the
+server joined this private network, and all 133 matches of the event
+ran over it.
+
+The FRITZ!Box connected to the exhibition network as its WAN side and
+did NAT. That way the server could still fetch the visitor photos
+(JPGs, `PHOTO_SOURCE = "HTTP"`, `HTTP_PHOTO_BASE_URL`) from the event's
+photo server, for the intro screen before each battle and the side
+panel during it. The retro clients only ever talk to the server inside
+the private WLAN.
+
+The WLAN channel was left on automatic, because the hall was full of
+hotspots from visitors' smartphones and the FRITZ!Box can move away
+from busy channels by itself. The box stood right next to the retro
+computers, and with that strong signal it was a rock-solid access
+point for the whole event.
+
+We recommend the same for events: hall WiFi quality is unknown in
+advance, and it can be crowded. With your own router the SSID, the IP
+addresses (give the server a fixed one; the clients have it in their
+config blocks) and the round trips (see the latency equalizer in
+`CLAUDE.md`) stay the same as at home.
+
 ## CC2026 results
 
 From Thursday evening (setup, 8 October) to Sunday afternoon the
@@ -51,32 +98,6 @@ interface:
 - **Commodore 64:** [Meatloaf](https://github.com/idolpx/meatloaf)
   (standard client) or [WiC64](https://www.wic64.de/) (experimental)
 - **Schneider/Amstrad CPC:** [M4 Board](https://www.cpcwiki.eu/index.php/M4_Board)
-
-### Network: bring your own WLAN
-
-At Classic Computing 2026 the setup ran on its own WLAN from a
-FRITZ!Box rather than the hall WiFi. All the retro computers and the
-server joined this private network, and nearly 100 battles were played
-on the real hardware.
-
-The FRITZ!Box connected to the exhibition network as its WAN side and
-did NAT. That way the server could still fetch the visitor photos
-(JPGs, `PHOTO_SOURCE = "HTTP"`, `HTTP_PHOTO_BASE_URL`) from the event's
-photo server, for the intro screen before each battle and the side
-panel during it. The retro clients only ever talk to the server inside
-the private WLAN.
-
-The WLAN channel was left on automatic, because the hall was full of
-hotspots from visitors' smartphones and the FRITZ!Box can move away
-from busy channels by itself. The box stood right next to the retro
-computers, and with that strong signal it was a rock-solid access
-point for the whole event.
-
-We recommend the same for events: hall WiFi quality is unknown in
-advance, and it can be crowded. With your own router the SSID, the IP
-addresses (give the server a fixed one; the clients have it in their
-config blocks) and the round trips (see the latency equalizer in
-`CLAUDE.md`) stay the same as at home.
 
 ## Quickstart
 
