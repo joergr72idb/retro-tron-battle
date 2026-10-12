@@ -132,7 +132,7 @@ from datetime import datetime
 # =============================================================================
 # VERSION - increment on every content change (shown in console + window)
 # =============================================================================
-SERVER_BUILD = 18
+SERVER_BUILD = 19
 # =============================================================================
 
 # =============================================================================
@@ -609,6 +609,12 @@ load_stats_from_csv()
 waiting_player: Player | None = None
 lock = asyncio.Lock()
 
+# A waiting HTTP player that hasn't polled /tick for this long is
+# treated as gone (C64 reset, new RUN, WiFi lost) and dropped instead of
+# being paired. All HTTP clients keep polling while they wait: CPC ~70 ms,
+# Meatloaf ~340 ms, WiC64 ~1.3 s; the worst Meatloaf gap at CC2026 was 2.7 s.
+WAITING_HTTP_STALE_S = 5.0
+
 # ---------------------------------------------------------------------------
 # Shared render state. The asyncio side (network thread) writes here
 # under render_lock; the pygame side (main thread) reads roughly 30
@@ -738,6 +744,15 @@ async def pair_and_maybe_start(platform: str, name: str, pin: str,
     photo_task = asyncio.get_running_loop().run_in_executor(None, fetch_photo_blocking, pin)
 
     async with lock:
+        drop_reason = stale_waiting_reason(platform, name)
+        if drop_reason:
+            old = waiting_player
+            waiting_player = None
+            log(f"[-] dropping waiting {old.platform}/{old.name}: {drop_reason}")
+            try:
+                old.writer.close()
+            except Exception:
+                pass
         if waiting_player is None:
             p = Player(reader, writer, platform, name, x=5, y=GRID_H // 2, direction="R",
                        pin=pin, photo_task=photo_task)
@@ -752,6 +767,31 @@ async def pair_and_maybe_start(platform: str, name: str, pin: str,
                         pin=pin, photo_task=photo_task)
 
     asyncio.create_task(run_game(p1, p2))
+
+
+def stale_waiting_reason(platform: str, name: str) -> str:
+    """Says why the current waiting player must not be paired with the
+    newcomer (or "" if it's fine). Seen twice at CC2026 (2 of 133 matches):
+    a client paired with its own dead entry - the Atari after a FujiNet
+    WiFi dropout (the TCP socket never closed, the dead side crashed at
+    once, 0 s game), and the C64 after a restart (its old HTTP session
+    never polled again)."""
+    w = waiting_player
+    if w is None:
+        return ""
+    if w.platform == platform and w.name == name:
+        # Same machine joins again: its old entry is dead or abandoned.
+        # The Atari sends nothing while waiting, so this is the only way
+        # to notice a silently lost FujiNet connection. (Two machines with
+        # the same default name and no PIN would replace each other.)
+        return "same client joined again"
+    if w.reader.at_eof():
+        return "connection closed"
+    if isinstance(w.reader, HTTPPlayerConn):
+        idle = time.monotonic() - (w.reader.last_tick_at or w.reader.joined_at)
+        if idle > WAITING_HTTP_STALE_S:
+            return f"no /tick for {idle:.1f} s"
+    return ""
 
 
 async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
@@ -811,6 +851,7 @@ class HTTPPlayerConn:
         self.name = ""
         self.last_tick_at = None  # monotonic() at the last /tick, for the
         # tick-latency logging in http_handle_request() below
+        self.joined_at = time.monotonic()  # for stale_waiting_reason()
         self.tick_gaps = []  # seconds between /ticks since GAME START, for
         # the dynamic equalizer (see setup_equalizer())
 

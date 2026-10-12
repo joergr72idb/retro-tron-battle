@@ -656,6 +656,31 @@ Isolated single poll gaps of 0.6-1.0 s (one per match at most) looked
 like WLAN hiccups, not client problems. Defaults (`EQ_POLL_FACTOR`
 0.75) kept unchanged.
 
+## Stale waiting player (server build 19, 2026-10-12)
+
+At CC2026 a client was paired with its own dead entry twice (2 of 133
+matches): ATARIXL vs ATARIXL after a FujiNet WiFi dropout (the old TCP
+socket never closed, the dead side crashed at once, 0 s game), and
+COMMODORE64 vs itself after a C64 restart (the old HTTP session never
+polled again, "not measured" in the equalizer line). The single
+`waiting_player` slot was paired without any check.
+
+`stale_waiting_reason()` now runs before every pairing and drops the
+waiting entry (log line `[-] dropping waiting ...`) if:
+- the same platform + name joins again - the only way to catch the
+  Atari case, since the Atari client sends nothing while waiting. Side
+  effect: two machines with the same default name and no PIN would
+  replace each other instead of playing;
+- its connection is at EOF (cleanly closed socket);
+- it's an HTTP player with no `/tick` for `WAITING_HTTP_STALE_S` (5 s).
+  All HTTP clients keep polling while waiting (CPC ~70 ms, Meatloaf
+  ~340 ms, WiC64 ~1.3 s; worst Meatloaf gap at CC2026 2.7 s).
+
+Verified headless only (real server, simulated clients): Atari
+re-HELLO while waiting -> WAIT, then paired with C64; silent C64
+session dropped after 6 s, CPC gets WAIT; CPC polling at 70 ms and a
+1.3 s WiC64-like poller are still paired normally.
+
 ## General, cross-platform patterns
 
 1. **Reserved variable names are a recurring trap.** ALWAYS check
