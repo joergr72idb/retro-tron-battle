@@ -32,8 +32,10 @@ this is all you need:
   [Hardware interfaces](#hardware-interfaces)). Each one needs its own
   screen and joystick.
 - **One computer for the server** (any machine with Python 3 and
-  pygame; a notebook is fine) plus **a big screen** for the playfield.
-  Visitors watch the battle there, not on the retro screens.
+  pygame) plus **a big screen** for the playfield. Visitors watch the
+  battle there, not on the retro screens. It doesn't have to be new: at
+  CC2026 the server ran on an old ThinkPad R400 with Debian 13, 8 GB
+  RAM and an SSD.
 - **Your own WLAN router**, see below.
 
 ### Network: bring your own WLAN
