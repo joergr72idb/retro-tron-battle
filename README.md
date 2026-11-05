@@ -97,6 +97,28 @@ battles. Occasional Meatloaf hiccups (about 1 % of polls took around
 1.5 s or longer) may play a part, but with constantly changing players
 the sample is small.
 
+## Early development
+
+The first steps happened on a Windows notebook in early September
+2026, before this repository existed.
+
+![Early development, 4 September 2026: server window with Atari vs C64, the Atari client in the Altirra emulator and a C64 test bot in a PowerShell console, sample portraits replaced by neutral player silhouettes](docs/images/early_dev_bot.jpg)
+
+*4 September 2026: the server window (left) with an Atari client in the
+Altirra emulator (top right) against a scripted "C64" opponent from a
+PowerShell console (bottom right, the forerunner of
+[`bots/tron_bot.ps1`](bots/tron_bot.ps1)).*
+
+![Early development, 5 September 2026: server build 1 showing CPC vs Atari, the sample portraits replaced by neutral player silhouettes](docs/images/early_dev_build1.jpg)
+
+*5 September 2026: server build 1, CPC vs Atari. During development
+the side panels showed sample portraits (Alfred E. Neuman and Albert
+Einstein); here they are replaced by neutral silhouettes. At
+Classic Computing 2026 their place was taken by the visitors
+themselves: each player entered the PIN of the photo that the
+[FOTOFIX](#thanks) booth had taken of them, and the server showed the
+two photos next to the playfield — picture A vs picture B.*
+
 ## Hardware interfaces
 
 Each of the retro computers connects to the server over a WiFi
