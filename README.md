@@ -181,6 +181,12 @@ speed) are clearly marked blocks at the top of
 `server/tron_server.py` — edit them directly there, no separate
 config file.
 
+## More for the CPC + M4
+
+[cpc-telnet](https://github.com/joergr72idb/cpc-telnet) - a telnet client
+for the Schneider/Amstrad CPC with the M4 board, made for the
+[Berlin Blues BBS](https://github.com/joergr72idb/atari-fujinet-berlin-blues-bbs).
+
 ## Thanks
 
 Hans has developed the fotofix idea - many thanks from here!
