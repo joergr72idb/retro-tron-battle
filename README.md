@@ -5,6 +5,10 @@ Commodore 64, Schneider/Amstrad CPC) with server-side rendering — built
 for [Classic Computing 2026](https://www.classic-computing.de/cc2026/)
 in Celle (10–11 October 2026).
 
+**Vibe coded:** this project - the server, the clients for all three machines and the docs - was
+generated with [Claude Code](https://claude.com/claude-code), Anthropic's AI coding assistant, from
+prompts; nearly every commit carries a `Co-Authored-By: Claude` line.
+
 ![Test setup: Atari XL, Commodore 64 and Schneider CPC at the PIN prompt, server display in the middle](docs/images/test_setup.jpg)
 
 *The test setup: Atari XL with FujiNet, Commodore 64 with Meatloaf and
